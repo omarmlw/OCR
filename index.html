@@ -2,67 +2,150 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>قراءة التذاكر الذكية</title>
+<title>قارئ التذاكر (Net)</title>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
 <style>
-body { text-align:center; font-family:Arial; direction:rtl; }
-video { width:300px; }
-button { padding:10px; margin:10px; font-size:18px; }
-#total { font-size:24px; color:green; }
+body {
+    text-align: center;
+    font-family: Arial;
+    direction: rtl;
+    background: #f5f5f5;
+}
+video {
+    width: 320px;
+    border: 2px solid #333;
+    border-radius: 10px;
+    margin-top: 10px;
+}
+button {
+    padding: 12px 20px;
+    margin: 8px;
+    font-size: 18px;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    background: #007bff;
+    color: white;
+}
+button:hover {
+    background: #0056b3;
+}
+#status {
+    margin-top: 10px;
+    font-weight: bold;
+}
+#result {
+    margin-top: 10px;
+    white-space: pre-wrap;
+    background: #fff;
+    padding: 10px;
+    border-radius: 8px;
+}
+#total {
+    font-size: 26px;
+    color: green;
+    margin-top: 20px;
+}
 </style>
 </head>
 
 <body>
 
-<h2>📷 قراءة Net من التذاكر</h2>
+<h2>📷 قراءة التذاكر (Net)</h2>
 
-<button onclick="startCamera()">تشغيل الكاميرا</button>
-<button onclick="capture()">التقاط</button>
+<button onclick="startCamera()">تشغيل الكاميرا الخلفية</button>
+<button onclick="capture()">📸 التقاط</button>
 
 <br>
-<video id="video" autoplay></video>
+<video id="video" autoplay playsinline></video>
 
+<div id="status"></div>
 <div id="result"></div>
 <div id="total">المجموع: 0</div>
 
 <script>
 let total = 0;
+let stream = null;
 
-function startCamera(){
-navigator.mediaDevices.getUserMedia({ video:true })
-.then(stream=>{
-document.getElementById("video").srcObject = stream;
-});
+// تشغيل الكاميرا الخلفية
+async function startCamera() {
+    document.getElementById("status").innerText = "🔄 جاري تشغيل الكاميرا...";
+
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+
+        let backCamera = devices.find(d =>
+            d.kind === "videoinput" &&
+            d.label.toLowerCase().includes("back")
+        );
+
+        if (!backCamera) {
+            backCamera = devices.find(d => d.kind === "videoinput");
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                deviceId: backCamera ? backCamera.deviceId : undefined,
+                facingMode: "environment"
+            }
+        });
+
+        document.getElementById("video").srcObject = stream;
+        document.getElementById("status").innerText = "✅ الكاميرا تعمل";
+
+    } catch (err) {
+        document.getElementById("status").innerText = "❌ فشل تشغيل الكاميرا";
+        alert("افتح الصفحة عبر https أو localhost واسمح بالكاميرا");
+        console.error(err);
+    }
 }
 
-function capture(){
-const video = document.getElementById("video");
-const canvas = document.createElement("canvas");
-const ctx = canvas.getContext("2d");
+// التقاط الصورة وتحليلها
+function capture() {
+    if (!stream) {
+        alert("شغل الكاميرا أولا");
+        return;
+    }
 
-canvas.width = video.videoWidth;
-canvas.height = video.videoHeight;
-ctx.drawImage(video,0,0);
+    document.getElementById("status").innerText = "📸 يتم التقاط الصورة...";
 
-Tesseract.recognize(canvas,'eng').then(({data:{text}})=>{
+    const video = document.getElementById("video");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
 
-document.getElementById("result").innerText = text;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-// 🔍 استخراج Net فقط
-let match = text.match(/Net[:\s]*([\d]+)/i);
+    ctx.drawImage(video, 0, 0);
 
-if(match){
-let value = parseInt(match[1]);
-total += value;
+    document.getElementById("status").innerText = "🤖 جاري تحليل التذكرة...";
 
-document.getElementById("total").innerText = "المجموع: " + total;
-}else{
-alert("لم يتم العثور على Net");
-}
+    Tesseract.recognize(canvas, 'eng')
+    .then(({ data: { text } }) => {
 
-});
+        document.getElementById("result").innerText = text;
+
+        // استخراج Net فقط
+        let match = text.match(/Net[:\s]*([\d]+)/i);
+
+        if (match) {
+            let value = parseInt(match[1]);
+            total += value;
+
+            document.getElementById("total").innerText = "المجموع: " + total;
+        } else {
+            alert("⚠️ لم يتم العثور على Net");
+        }
+
+        document.getElementById("status").innerText = "✅ تم بنجاح";
+
+    })
+    .catch(err => {
+        document.getElementById("status").innerText = "❌ خطأ في التحليل";
+        console.error(err);
+    });
 }
 </script>
 
