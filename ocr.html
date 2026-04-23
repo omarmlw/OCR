@@ -1,638 +1,795 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Net Ticket Scanner</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>NET SCANNER PRO — OMAR MLW</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Teko:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-  :root {
-    --green:   #00ff88;
-    --green2:  #00c96a;
-    --red:     #ff4444;
-    --bg:      #0a0c0f;
-    --panel:   #111418;
-    --border:  #1e2530;
-    --text:    #c8d6e5;
-    --mono:    'Share Tech Mono', monospace;
-    --display: 'Teko', sans-serif;
-  }
+:root{
+  --g:   #00ff88;
+  --g2:  #00c96a;
+  --g3:  #004d2a;
+  --b:   #00d4ff;
+  --r:   #ff4455;
+  --y:   #ffd000;
+  --bg:  #07090c;
+  --p1:  #0d1117;
+  --p2:  #111820;
+  --brd: #1a2332;
+  --txt: #8ba3be;
+  --mono:'Share Tech Mono',monospace;
+  --orb: 'Orbitron',sans-serif;
+}
 
-  html, body {
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--mono);
-    overflow-x: hidden;
-  }
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:var(--mono);overflow-x:hidden}
 
-  body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 16px 12px 32px;
-    gap: 14px;
-    min-height: 100dvh;
-  }
+body{
+  display:flex;flex-direction:column;align-items:center;
+  padding:12px 10px 28px;gap:10px;min-height:100dvh;
+}
 
-  /* ── Header ── */
-  header {
-    width: 100%;
-    max-width: 480px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border);
-  }
+/* ── noise grain overlay ── */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.4;
+}
 
-  header h1 {
-    font-family: var(--display);
-    font-size: 2rem;
-    font-weight: 700;
-    letter-spacing: 2px;
-    color: var(--green);
-    text-shadow: 0 0 18px rgba(0,255,136,.35);
-  }
+/* ── header ── */
+header{
+  width:100%;max-width:500px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--brd);padding-bottom:10px;
+}
+header h1{
+  font-family:var(--orb);font-size:1.3rem;font-weight:900;
+  letter-spacing:3px;color:var(--g);
+  text-shadow:0 0 20px rgba(0,255,136,.4),0 0 60px rgba(0,255,136,.1);
+}
+.ver{font-size:.55rem;letter-spacing:2px;color:#2a3a4a;text-align:right;line-height:1.6}
 
-  header .badge {
-    font-size: .65rem;
-    letter-spacing: 1.5px;
-    color: #4a5568;
-    text-transform: uppercase;
-  }
+/* ── tabs ── */
+.tabs{
+  width:100%;max-width:500px;
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  background:var(--p1);border:1px solid var(--brd);border-radius:6px;overflow:hidden;
+}
+.tab{
+  font-family:var(--orb);font-size:.6rem;letter-spacing:1.5px;
+  padding:9px 4px;text-align:center;cursor:pointer;
+  background:none;border:none;color:#2a3a4a;
+  transition:color .2s,background .2s;
+}
+.tab.active{color:var(--g);background:rgba(0,255,136,.06);border-bottom:2px solid var(--g)}
+.tab:hover:not(.active){color:var(--txt)}
 
-  /* ── Camera wrapper ── */
-  .cam-wrap {
-    position: relative;
-    width: 100%;
-    max-width: 480px;
-    aspect-ratio: 4/3;
-    background: #050608;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-  }
+/* ── panels ── */
+.panel{display:none;width:100%;max-width:500px;flex-direction:column;gap:10px}
+.panel.active{display:flex}
 
-  #video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
+/* ═══════════════ SCANNER TAB ═══════════════ */
 
-  /* scanning overlay box */
-  .scan-box {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 75%; height: 26%;
-    border: 2px solid var(--green);
-    border-radius: 4px;
-    box-shadow: 0 0 0 2000px rgba(0,0,0,.45), inset 0 0 12px rgba(0,255,136,.12);
-    pointer-events: none;
-    transition: border-color .2s;
-  }
-  .scan-box.detected { border-color: #00ffff; box-shadow: 0 0 0 2000px rgba(0,0,0,.45), inset 0 0 20px rgba(0,255,255,.25); }
+/* camera */
+.cam-wrap{
+  position:relative;width:100%;aspect-ratio:4/3;
+  background:#020304;border:1px solid var(--brd);border-radius:6px;overflow:hidden;
+}
+#video{width:100%;height:100%;object-fit:cover;display:block}
 
-  /* corner ticks */
-  .scan-box::before, .scan-box::after,
-  .scan-box .tick-br, .scan-box .tick-bl {
-    content: '';
-    position: absolute;
-    width: 14px; height: 14px;
-    border-color: var(--green);
-    border-style: solid;
-  }
-  .scan-box::before  { top: -2px; left: -2px;  border-width: 3px 0 0 3px; }
-  .scan-box::after   { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
-  .scan-box .tick-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
-  .scan-box .tick-bl { bottom: -2px; left: -2px;  border-width: 0 0 3px 3px; }
+/* scan zone overlay */
+.scan-zone{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:80%;height:28%;
+  pointer-events:none;
+}
+.sz-border{
+  position:absolute;inset:0;
+  border:2px solid var(--g);border-radius:3px;
+  box-shadow:0 0 0 2000px rgba(0,0,0,.5),inset 0 0 16px rgba(0,255,136,.08);
+  transition:border-color .15s,box-shadow .15s;
+}
+.sz-border.hit{
+  border-color:var(--b);
+  box-shadow:0 0 0 2000px rgba(0,0,0,.5),inset 0 0 30px rgba(0,212,255,.25);
+}
+/* corners */
+.c{position:absolute;width:16px;height:16px;border-color:var(--g);border-style:solid;transition:border-color .15s}
+.c.tl{top:-2px;left:-2px;border-width:3px 0 0 3px}
+.c.tr{top:-2px;right:-2px;border-width:3px 3px 0 0}
+.c.br{bottom:-2px;right:-2px;border-width:0 3px 3px 0}
+.c.bl{bottom:-2px;left:-2px;border-width:0 0 3px 3px}
+.sz-border.hit .c{border-color:var(--b)}
 
-  /* scan line animation */
-  .scan-line {
-    position: absolute;
-    left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--green), transparent);
-    animation: sweep 1.6s ease-in-out infinite;
-    opacity: 0;
-  }
-  .scanning .scan-line { opacity: 1; }
-  @keyframes sweep {
-    0%   { top: 0%; }
-    50%  { top: calc(100% - 2px); }
-    100% { top: 0%; }
-  }
+/* scan line */
+.scan-line{
+  position:absolute;left:2px;right:2px;height:2px;top:0;
+  background:linear-gradient(90deg,transparent,var(--g),transparent);
+  opacity:0;animation:sweep 1s ease-in-out infinite;
+}
+.scanning .scan-line{opacity:1}
+@keyframes sweep{0%{top:0}50%{top:calc(100% - 2px)}100%{top:0}}
 
-  /* status chip */
-  .status-chip {
-    position: absolute;
-    bottom: 8px; left: 50%;
-    transform: translateX(-50%);
-    font-size: .65rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    background: rgba(0,0,0,.7);
-    border: 1px solid var(--border);
-    padding: 3px 10px;
-    border-radius: 20px;
-    white-space: nowrap;
-    transition: color .2s, border-color .2s;
-  }
-  .status-chip.ready    { color: #4a5568; }
-  .status-chip.scanning { color: var(--green); border-color: rgba(0,255,136,.4); }
-  .status-chip.detected { color: #00ffff;   border-color: rgba(0,255,255,.4); }
-  .status-chip.error    { color: var(--red); border-color: rgba(255,68,68,.4); }
+/* fps / status bar */
+.cam-hud{
+  position:absolute;top:6px;left:6px;right:6px;
+  display:flex;justify-content:space-between;align-items:center;
+  pointer-events:none;
+}
+.hud-chip{
+  font-size:.55rem;letter-spacing:1.5px;
+  background:rgba(7,9,12,.8);border:1px solid var(--brd);
+  padding:3px 8px;border-radius:20px;backdrop-filter:blur(4px);
+}
+#statusChip{transition:color .2s,border-color .2s}
+#statusChip.sc{color:var(--g);border-color:rgba(0,255,136,.4)}
+#statusChip.dt{color:var(--b);border-color:rgba(0,212,255,.4)}
+#statusChip.er{color:var(--r);border-color:rgba(255,68,85,.4)}
+#fpsChip{color:#2a3a4a}
 
-  /* ── Total panel ── */
-  .total-panel {
-    width: 100%;
-    max-width: 480px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
+/* confidence bar */
+.conf-bar-wrap{
+  position:absolute;bottom:6px;left:8%;right:8%;height:3px;
+  background:rgba(255,255,255,.05);border-radius:2px;
+}
+.conf-bar{height:100%;width:0%;background:var(--g);border-radius:2px;transition:width .3s,background .3s}
 
-  .total-label {
-    font-size: .6rem;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #4a5568;
-  }
+/* totals row */
+.totals{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;
+}
+.total-card{
+  background:var(--p1);border:1px solid var(--brd);border-radius:6px;
+  padding:10px 12px;
+}
+.tc-label{font-size:.5rem;letter-spacing:2.5px;text-transform:uppercase;color:#2a3a4a;margin-bottom:4px}
+.tc-value{
+  font-family:var(--orb);font-size:1.5rem;font-weight:700;
+  color:var(--g);text-shadow:0 0 16px rgba(0,255,136,.3);line-height:1;
+  transition:transform .15s;
+}
+.tc-value.pop{transform:scale(1.12)}
+.tc-value.blue{color:var(--b);text-shadow:0 0 16px rgba(0,212,255,.3)}
+.tc-value.gold{color:var(--y);text-shadow:0 0 16px rgba(255,208,0,.3)}
 
-  .total-value {
-    font-family: var(--display);
-    font-size: 3.2rem;
-    font-weight: 700;
-    color: var(--green);
-    text-shadow: 0 0 24px rgba(0,255,136,.4);
-    line-height: 1;
-    letter-spacing: 1px;
-    transition: transform .15s;
-  }
-  .total-value.pop { transform: scale(1.08); }
+/* start button */
+.start-btn{
+  width:100%;font-family:var(--orb);font-size:1rem;font-weight:700;
+  letter-spacing:3px;padding:14px;border-radius:6px;cursor:pointer;
+  background:transparent;border:2px solid var(--g);color:var(--g);
+  transition:background .2s,color .2s,box-shadow .2s;
+  text-transform:uppercase;
+}
+.start-btn:hover,.start-btn:active{background:var(--g);color:#07090c;box-shadow:0 0 28px rgba(0,255,136,.4)}
+.start-btn.stop{border-color:var(--r);color:var(--r)}
+.start-btn.stop:hover,.start-btn.stop:active{background:var(--r);color:#fff;box-shadow:0 0 28px rgba(255,68,85,.4)}
 
-  /* ── History ── */
-  .history-panel {
-    width: 100%;
-    max-width: 480px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px 16px;
-    flex: 1;
-  }
+/* history list */
+.history-box{
+  background:var(--p1);border:1px solid var(--brd);border-radius:6px;
+  padding:10px 12px;flex:1;
+}
+.hb-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hb-title{font-size:.55rem;letter-spacing:3px;text-transform:uppercase;color:#2a3a4a}
+.ghost-btn{
+  font-family:var(--mono);font-size:.55rem;letter-spacing:1.5px;
+  background:none;border:1px solid var(--brd);color:#2a3a4a;
+  padding:3px 10px;border-radius:3px;cursor:pointer;transition:color .2s,border-color .2s;
+  text-transform:uppercase;
+}
+.ghost-btn:hover{color:var(--r);border-color:rgba(255,68,85,.4)}
+.ghost-btn.dl:hover{color:var(--g);border-color:rgba(0,255,136,.4)}
 
-  .history-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
+#historyList{list-style:none;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto}
+#historyList::-webkit-scrollbar{width:3px}
+#historyList::-webkit-scrollbar-thumb{background:var(--brd);border-radius:2px}
+#historyList li{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.75rem;color:#3a5068;padding:3px 0;
+  border-bottom:1px solid rgba(255,255,255,.02);animation:fadeIn .25s ease;
+}
+#historyList li .val{color:var(--g2)}
+#historyList li .idx{font-size:.55rem;color:#1e2d3d}
+@keyframes fadeIn{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
 
-  .history-title {
-    font-size: .6rem;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #4a5568;
-  }
+/* ═══════════════ AI TAB ═══════════════ */
+.ai-panel{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:14px}
+.ai-label{font-size:.55rem;letter-spacing:3px;text-transform:uppercase;color:#2a3a4a;margin-bottom:8px}
 
-  #clearBtn {
-    font-family: var(--mono);
-    font-size: .6rem;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    background: none;
-    border: 1px solid #1e2530;
-    color: #4a5568;
-    padding: 3px 10px;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: color .2s, border-color .2s;
-  }
-  #clearBtn:hover { color: var(--red); border-color: rgba(255,68,68,.4); }
+.ai-output{
+  min-height:120px;max-height:300px;overflow-y:auto;
+  font-size:.8rem;line-height:1.7;color:var(--txt);
+  white-space:pre-wrap;word-break:break-word;
+}
+.ai-output::-webkit-scrollbar{width:3px}
+.ai-output::-webkit-scrollbar-thumb{background:var(--brd)}
+.ai-output .ai-thinking{color:#2a3a4a;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.ai-output .ai-highlight{color:var(--g)}
+.ai-output .ai-warn{color:var(--y)}
+.ai-output .ai-error{color:var(--r)}
 
-  #historyList {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    max-height: 160px;
-    overflow-y: auto;
-  }
+.ai-btn{
+  width:100%;font-family:var(--orb);font-size:.75rem;letter-spacing:2px;
+  padding:11px;border-radius:5px;cursor:pointer;
+  background:transparent;border:1px solid var(--b);color:var(--b);
+  transition:background .2s,color .2s,box-shadow .2s;text-transform:uppercase;
+}
+.ai-btn:hover{background:var(--b);color:#07090c;box-shadow:0 0 20px rgba(0,212,255,.3)}
+.ai-btn:disabled{opacity:.3;cursor:not-allowed}
 
-  #historyList::-webkit-scrollbar { width: 4px; }
-  #historyList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+/* quick questions */
+.quick-qs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.qq{
+  font-family:var(--mono);font-size:.6rem;letter-spacing:1px;
+  background:none;border:1px solid var(--brd);color:#3a5068;
+  padding:4px 10px;border-radius:20px;cursor:pointer;
+  transition:color .2s,border-color .2s;
+}
+.qq:hover{color:var(--b);border-color:rgba(0,212,255,.4)}
 
-  #historyList li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: .8rem;
-    color: #4a6080;
-    padding: 3px 0;
-    border-bottom: 1px solid rgba(255,255,255,.03);
-    animation: fadeIn .3s ease;
-  }
-  #historyList li span.val { color: var(--green2); }
-  #historyList li span.idx { font-size: .6rem; color: #2d3748; }
+/* custom prompt */
+#aiPrompt{
+  width:100%;font-family:var(--mono);font-size:.75rem;
+  background:var(--p2);border:1px solid var(--brd);color:var(--txt);
+  padding:9px 12px;border-radius:5px;resize:none;height:60px;
+  outline:none;transition:border-color .2s;margin-bottom:8px;
+}
+#aiPrompt:focus{border-color:rgba(0,212,255,.4)}
 
-  @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+/* ═══════════════ EXPORT TAB ═══════════════ */
+.export-card{
+  background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:14px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.export-row{display:flex;gap:8px;align-items:center}
+.export-label{font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:#2a3a4a;flex:1}
+.ex-btn{
+  font-family:var(--mono);font-size:.6rem;letter-spacing:1.5px;
+  background:none;border:1px solid var(--brd);color:#3a5068;
+  padding:6px 14px;border-radius:4px;cursor:pointer;
+  transition:color .2s,border-color .2s,background .2s;text-transform:uppercase;
+}
+.ex-btn:hover{color:var(--g);border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.05)}
 
-  /* ── Button ── */
-  #startBtn {
-    width: 100%;
-    max-width: 480px;
-    font-family: var(--display);
-    font-size: 1.5rem;
-    font-weight: 600;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    background: transparent;
-    border: 2px solid var(--green);
-    color: var(--green);
-    padding: 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background .2s, color .2s, box-shadow .2s;
-  }
-  #startBtn:hover, #startBtn:active {
-    background: var(--green);
-    color: #0a0c0f;
-    box-shadow: 0 0 24px rgba(0,255,136,.35);
-  }
-  #startBtn.stop {
-    border-color: var(--red);
-    color: var(--red);
-  }
-  #startBtn.stop:hover, #startBtn.stop:active {
-    background: var(--red);
-    color: #fff;
-    box-shadow: 0 0 24px rgba(255,68,68,.35);
-  }
+/* preview */
+#exportPreview{
+  font-size:.65rem;line-height:1.8;color:#2a3a4a;
+  background:var(--p2);border:1px solid var(--brd);border-radius:4px;
+  padding:10px;max-height:220px;overflow-y:auto;white-space:pre;
+}
+#exportPreview::-webkit-scrollbar{width:3px}
+#exportPreview::-webkit-scrollbar-thumb{background:var(--brd)}
 
-  /* ── Canvas (hidden) ── */
-  #canvas { display: none; }
+/* canvas */
+#canvas{display:none}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>NET SCANNER</h1>
-  <span class="badge">By OMAR MLW — 2026</span>
+  <h1>NET SCANNER PRO</h1>
+  <div class="ver">BY OMAR MLW<br>2026 — v2.0</div>
 </header>
 
-<!-- Camera preview -->
-<div class="cam-wrap" id="camWrap">
-  <video id="video" autoplay playsinline muted></video>
-  <div class="scan-box" id="scanBox">
-    <span class="tick-br"></span>
-    <span class="tick-bl"></span>
-    <div class="scan-line"></div>
-  </div>
-  <div class="status-chip ready" id="statusChip">READY</div>
+<!-- Tab bar -->
+<div class="tabs">
+  <button class="tab active" data-tab="scanner">📷 SCANNER</button>
+  <button class="tab" data-tab="ai">🤖 AI</button>
+  <button class="tab" data-tab="export">💾 EXPORT</button>
 </div>
 
-<!-- Total display -->
-<div class="total-panel">
-  <div>
-    <div class="total-label">Running Total</div>
-    <div class="total-value" id="totalDisplay">0.00</div>
+<!-- ═══════ SCANNER PANEL ═══════ -->
+<div class="panel active" id="panel-scanner">
+
+  <!-- Camera -->
+  <div class="cam-wrap" id="camWrap">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="scan-zone" id="scanZone">
+      <div class="sz-border" id="szBorder">
+        <div class="c tl"></div><div class="c tr"></div>
+        <div class="c br"></div><div class="c bl"></div>
+        <div class="scan-line"></div>
+      </div>
+    </div>
+    <div class="cam-hud">
+      <div class="hud-chip" id="statusChip">READY</div>
+      <div class="hud-chip" id="fpsChip">0 fps</div>
+    </div>
+    <div class="conf-bar-wrap">
+      <div class="conf-bar" id="confBar"></div>
+    </div>
   </div>
-  <div style="text-align:right">
-    <div class="total-label">Tickets</div>
-    <div style="font-family:var(--display);font-size:2rem;color:#4a5568;line-height:1" id="countDisplay">0</div>
+
+  <!-- Totals -->
+  <div class="totals">
+    <div class="total-card">
+      <div class="tc-label">TOTAL NET</div>
+      <div class="tc-value" id="totalDisplay">0.00</div>
+    </div>
+    <div class="total-card">
+      <div class="tc-label">TICKETS</div>
+      <div class="tc-value blue" id="countDisplay">0</div>
+    </div>
+    <div class="total-card">
+      <div class="tc-label">AVERAGE</div>
+      <div class="tc-value gold" id="avgDisplay">—</div>
+    </div>
+  </div>
+
+  <!-- Start/Stop -->
+  <button class="start-btn" id="startBtn">▶ START CAMERA</button>
+
+  <!-- History -->
+  <div class="history-box">
+    <div class="hb-header">
+      <span class="hb-title">SCAN HISTORY</span>
+      <button class="ghost-btn" id="clearBtn">CLEAR</button>
+    </div>
+    <ul id="historyList"></ul>
   </div>
 </div>
 
-<!-- Scan history -->
-<div class="history-panel">
-  <div class="history-header">
-    <span class="history-title">Scan History</span>
-    <button id="clearBtn">Clear</button>
+<!-- ═══════ AI PANEL ═══════ -->
+<div class="panel" id="panel-ai">
+  <div class="ai-panel">
+    <div class="ai-label">QUICK QUESTIONS</div>
+    <div class="quick-qs">
+      <button class="qq" data-q="حلل البيانات وأعطني ملخصاً شاملاً">📊 ملخص شامل</button>
+      <button class="qq" data-q="هل توجد قيم شاذة أو مشبوهة؟">🔍 شذوذات</button>
+      <button class="qq" data-q="ما القيمة الأكبر والأصغر والمتوسط؟">📈 إحصاءات</button>
+      <button class="qq" data-q="قدّر إجمالي جميع التذاكر وقارنه بالمتوسط المتوقع">💰 تقدير</button>
+      <button class="qq" data-q="هل البيانات منطقية؟ هل ثمة تكرار أو خطأ؟">✅ تحقق</button>
+    </div>
+    <div class="ai-label" style="margin-top:6px">CUSTOM PROMPT</div>
+    <textarea id="aiPrompt" placeholder="اكتب سؤالك هنا..."></textarea>
+    <button class="ai-btn" id="aiBtn">🤖 ANALYZE WITH CLAUDE AI</button>
   </div>
-  <ul id="historyList"></ul>
+
+  <div class="ai-panel">
+    <div class="ai-label">AI RESPONSE</div>
+    <div class="ai-output" id="aiOutput"><span style="color:#1e2d3d">— في انتظار التحليل —</span></div>
+  </div>
 </div>
 
-<!-- Start/Stop button -->
-<button id="startBtn">▶ Start Camera</button>
+<!-- ═══════ EXPORT PANEL ═══════ -->
+<div class="panel" id="panel-export">
+  <div class="export-card">
+    <div class="export-row">
+      <div class="export-label">📄 تحميل السجل كـ TXT</div>
+      <button class="ex-btn" id="dlTxt">DOWNLOAD</button>
+    </div>
+    <div class="export-row">
+      <div class="export-label">📋 نسخ السجل للحافظة</div>
+      <button class="ex-btn" id="cpTxt">COPY</button>
+    </div>
+    <div class="export-row">
+      <div class="export-label">🔄 تحديث المعاينة</div>
+      <button class="ex-btn" id="previewBtn">REFRESH</button>
+    </div>
+    <div class="ai-label" style="margin-top:4px">FILE PREVIEW</div>
+    <pre id="exportPreview">— لا توجد بيانات بعد —</pre>
+  </div>
+</div>
 
-<!-- Hidden canvas for frame capture -->
 <canvas id="canvas"></canvas>
 
 <script>
-  /* ───────────────────────────────────────────────
-     STATE
-  ─────────────────────────────────────────────── */
-  let stream        = null;   // MediaStream
-  let scanInterval  = null;   // interval handle
-  let worker        = null;   // Tesseract worker
-  let isScanning    = false;
-  let isProcessing  = false;  // debounce OCR calls
-  let runningTotal  = 0;
-  let ticketCount   = 0;
-  let lastScannedValue = null; // prevent duplicate scans
-  let scanHistory   = [];
+/* ═══════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════ */
+let stream       = null;
+let worker       = null;
+let scanInterval = null;
+let isScanning   = false;
+let isOCRBusy    = false;
 
-  /* ───────────────────────────────────────────────
-     ELEMENTS
-  ─────────────────────────────────────────────── */
-  const video        = document.getElementById('video');
-  const canvas       = document.getElementById('canvas');
-  const ctx          = canvas.getContext('2d');
-  const startBtn     = document.getElementById('startBtn');
-  const totalDisplay = document.getElementById('totalDisplay');
-  const countDisplay = document.getElementById('countDisplay');
-  const historyList  = document.getElementById('historyList');
-  const statusChip   = document.getElementById('statusChip');
-  const scanBox      = document.getElementById('scanBox');
-  const camWrap      = document.getElementById('camWrap');
-  const clearBtn     = document.getElementById('clearBtn');
+let runningTotal   = 0;
+let ticketCount    = 0;
+let lastValue      = null;
+let scanHistory    = [];   // [{index, value, ts, conf}]
 
-  /* ───────────────────────────────────────────────
-     AUDIO – short beep via Web Audio API
-  ─────────────────────────────────────────────── */
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// adaptive speed
+let consecutiveMisses = 0;
+let currentInterval   = 500;   // ms – starts fast
 
-  function beep() {
-    const osc  = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.type            = 'sine';
-    osc.frequency.value = 1200;           // Hz
-    gain.gain.setValueAtTime(.4, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + .15);
-    osc.start();
-    osc.stop(audioCtx.currentTime + .15);
+// FPS counter
+let fpsFrames = 0, fpsLast = performance.now();
+
+/* ═══════════════════════════════════════════════════════════
+   ELEMENTS
+═══════════════════════════════════════════════════════════ */
+const video        = document.getElementById('video');
+const canvas       = document.getElementById('canvas');
+const ctx          = canvas.getContext('2d', {willReadFrequently:true});
+const startBtn     = document.getElementById('startBtn');
+const totalDisplay = document.getElementById('totalDisplay');
+const countDisplay = document.getElementById('countDisplay');
+const avgDisplay   = document.getElementById('avgDisplay');
+const historyList  = document.getElementById('historyList');
+const statusChip   = document.getElementById('statusChip');
+const fpsChip      = document.getElementById('fpsChip');
+const confBar      = document.getElementById('confBar');
+const szBorder     = document.getElementById('szBorder');
+const camWrap      = document.getElementById('camWrap');
+
+/* ═══════════════════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════════════════ */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'export') refreshPreview();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════
+   AUDIO — Web Audio API beep (no file needed)
+═══════════════════════════════════════════════════════════ */
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+function beep(freq=1400, dur=0.12, vol=0.35) {
+  const osc = AC.createOscillator();
+  const gain = AC.createGain();
+  osc.connect(gain); gain.connect(AC.destination);
+  osc.type = 'sine'; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, AC.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  osc.start(); osc.stop(AC.currentTime + dur);
+}
+
+function vibrate(ms=80) { navigator.vibrate?.(ms); }
+
+/* ═══════════════════════════════════════════════════════════
+   STATUS
+═══════════════════════════════════════════════════════════ */
+function setStatus(cls, text) {
+  statusChip.className = 'hud-chip ' + cls;
+  statusChip.textContent = text;
+  if (cls === 'sc') camWrap.classList.add('scanning');
+  else camWrap.classList.remove('scanning');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT TESSERACT WORKER — one-time
+═══════════════════════════════════════════════════════════ */
+async function initWorker() {
+  worker = await Tesseract.createWorker('eng', 1, { logger: ()=>{} });
+  await worker.setParameters({
+    // allow: Net + digits + punctuation
+    tessedit_char_whitelist: 'NnEeTt0123456789.,:-/ ',
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,  // single line = much faster
+    tesseract_char_blacklist: '!@#$%^&*()_+=[]{}|;<>?',
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FRAME CAPTURE — crop + enhance
+   Strategy: 80% w × 28% h center crop, scaled ×1.8,
+   greyscale + unsharp-mask-like contrast boost.
+═══════════════════════════════════════════════════════════ */
+function captureRegion() {
+  const vw = video.videoWidth  || 640;
+  const vh = video.videoHeight || 480;
+
+  const cw = Math.floor(vw * 0.80);
+  const ch = Math.floor(vh * 0.28);
+  const cx = Math.floor((vw - cw) / 2);
+  const cy = Math.floor((vh - ch) / 2);
+
+  const scale = 1.8;          // enough detail, not too slow
+  const dw = Math.floor(cw * scale);
+  const dh = Math.floor(ch * scale);
+
+  canvas.width = dw; canvas.height = dh;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(video, cx, cy, cw, ch, 0, 0, dw, dh);
+
+  /* ── greyscale + contrast ── */
+  const img = ctx.getImageData(0, 0, dw, dh);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let l = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    // S-curve contrast
+    l = ((l/255 - 0.5) * 2.5 + 0.5) * 255;
+    l = Math.max(0, Math.min(255, l));
+    d[i] = d[i+1] = d[i+2] = l;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  return canvas;    // return canvas element (Tesseract accepts it directly)
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EXTRACT NET VALUE
+   Handles: Net: 125.50 | NET:84 | net 200,00 | Net-55.5
+═══════════════════════════════════════════════════════════ */
+function extractNet(text) {
+  // broad regex: "Net" then optional separator then number
+  const m = text.match(/[Nn][Ee][Tt]\s*[:\-]?\s*([\d]+(?:[.,]\d{1,2})?)/);
+  if (!m) return null;
+  const val = parseFloat(m[1].replace(',', '.'));
+  return isNaN(val) || val <= 0 ? null : val;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SCAN LOOP — adaptive speed
+═══════════════════════════════════════════════════════════ */
+async function scanOnce() {
+  if (isOCRBusy || !isScanning) return;
+  isOCRBusy = true;
+
+  /* FPS count */
+  fpsFrames++;
+  const now = performance.now();
+  if (now - fpsLast >= 2000) {
+    fpsChip.textContent = Math.round(fpsFrames / ((now - fpsLast) / 1000)) + ' fps';
+    fpsFrames = 0; fpsLast = now;
   }
 
-  /* ───────────────────────────────────────────────
-     VIBRATION (mobile only)
-  ─────────────────────────────────────────────── */
-  function vibrate() {
-    if (navigator.vibrate) navigator.vibrate(60);
-  }
+  try {
+    const region = captureRegion();
+    const { data } = await worker.recognize(region);
+    const conf  = data.confidence || 0;
+    const value = extractNet(data.text);
 
-  /* ───────────────────────────────────────────────
-     STATUS CHIP
-  ─────────────────────────────────────────────── */
-  function setStatus(state, text) {
-    statusChip.className = `status-chip ${state}`;
-    statusChip.textContent = text;
-    if (state === 'scanning') {
-      camWrap.classList.add('scanning');
+    // confidence bar
+    confBar.style.width = conf + '%';
+    confBar.style.background = conf > 65 ? 'var(--g)' : conf > 35 ? 'var(--y)' : 'var(--r)';
+
+    if (value !== null && value !== lastValue) {
+      lastValue = value;
+      registerScan(value, conf);
+      consecutiveMisses = 0;
+      adaptInterval(300);   // detected → scan fast
     } else {
-      camWrap.classList.remove('scanning');
-    }
-  }
-
-  /* ───────────────────────────────────────────────
-     INIT TESSERACT WORKER
-  ─────────────────────────────────────────────── */
-  async function initWorker() {
-    worker = await Tesseract.createWorker('eng', 1, {
-      // suppress verbose logs
-      logger: () => {}
-    });
-
-    // Restrict character set: digits, dot, comma, and the word "Net"
-    await worker.setParameters({
-      tessedit_char_whitelist: 'NetNET0123456789.,: ',
-      tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
-    });
-  }
-
-  /* ───────────────────────────────────────────────
-     CROP CENTER REGION FROM VIDEO FRAME
-     Crops the center 75% width × 26% height of the
-     video – matching the visual scan-box overlay.
-  ─────────────────────────────────────────────── */
-  function captureRegion() {
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-
-    // Match scan-box proportions: 75% w, 26% h, centered
-    const cropW = Math.floor(vw * 0.75);
-    const cropH = Math.floor(vh * 0.26);
-    const cropX = Math.floor((vw - cropW) / 2);
-    const cropY = Math.floor((vh - cropH) / 2);
-
-    // Render at 2× for better OCR accuracy
-    const scale = 2;
-    canvas.width  = cropW * scale;
-    canvas.height = cropH * scale;
-
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
-
-    // Contrast boost: convert to greyscale + increase contrast
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const d   = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      // greyscale
-      const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-      // contrast stretch: push dark darker, light lighter
-      const c   = ((lum / 255 - 0.5) * 2.2 + 0.5) * 255;
-      const v   = Math.max(0, Math.min(255, c));
-      d[i] = d[i+1] = d[i+2] = v;
-    }
-    ctx.putImageData(img, 0, 0);
-
-    return canvas.toDataURL('image/png');
-  }
-
-  /* ───────────────────────────────────────────────
-     EXTRACT NET VALUE FROM OCR TEXT
-     Regex: looks for "Net" (case-insensitive)
-     followed (optionally) by colon/space and digits.
-  ─────────────────────────────────────────────── */
-  function extractNetValue(text) {
-    // e.g.  "Net: 125.50"  or  "NET 84"  or  "Net:84.00"
-    const match = text.match(/[Nn][Ee][Tt]\s*[:\-]?\s*([\d]+(?:[.,]\d+)?)/);
-    if (!match) return null;
-    // normalise comma decimal separator → dot
-    const raw = match[1].replace(',', '.');
-    const val = parseFloat(raw);
-    return isNaN(val) ? null : val;
-  }
-
-  /* ───────────────────────────────────────────────
-     SINGLE SCAN CYCLE
-  ─────────────────────────────────────────────── */
-  async function scanFrame() {
-    if (isProcessing || !isScanning) return;
-    isProcessing = true;
-
-    try {
-      const dataURL = captureRegion();
-      const { data: { text } } = await worker.recognize(dataURL);
-      const value = extractNetValue(text);
-
-      if (value !== null) {
-        // Ignore if same as last scan (duplicate prevention)
-        if (value !== lastScannedValue) {
-          lastScannedValue = value;
-          registerScan(value);
-        }
-        // Show "detected" UI briefly even for duplicates
-        flashDetected();
-      }
-    } catch (err) {
-      console.warn('OCR error:', err);
+      consecutiveMisses++;
+      if (consecutiveMisses > 5) adaptInterval(700);  // quiet → slow down
     }
 
-    isProcessing = false;
+  } catch(e) {
+    console.warn('OCR:', e);
   }
+  isOCRBusy = false;
+}
 
-  /* ───────────────────────────────────────────────
-     REGISTER A NEW SCAN
-  ─────────────────────────────────────────────── */
-  function registerScan(value) {
-    runningTotal += value;
-    ticketCount++;
-    scanHistory.unshift({ value, index: ticketCount });
+function adaptInterval(ms) {
+  if (ms === currentInterval) return;
+  currentInterval = ms;
+  clearInterval(scanInterval);
+  scanInterval = setInterval(scanOnce, currentInterval);
+}
 
-    // Update displays
-    totalDisplay.textContent = runningTotal.toFixed(2);
-    countDisplay.textContent = ticketCount;
+/* ═══════════════════════════════════════════════════════════
+   REGISTER SCAN
+═══════════════════════════════════════════════════════════ */
+function registerScan(value, conf) {
+  runningTotal += value;
+  ticketCount++;
+  const entry = { index: ticketCount, value, ts: new Date().toLocaleTimeString(), conf: Math.round(conf) };
+  scanHistory.unshift(entry);
 
-    // Pop animation on total
-    totalDisplay.classList.add('pop');
-    setTimeout(() => totalDisplay.classList.remove('pop'), 200);
+  // totals
+  totalDisplay.textContent = runningTotal.toFixed(2);
+  countDisplay.textContent = ticketCount;
+  avgDisplay.textContent   = (runningTotal / ticketCount).toFixed(2);
 
-    // Add to history list
-    const li = document.createElement('li');
-    li.innerHTML = `
-      <span class="idx">#${ticketCount}</span>
-      <span>NET detected</span>
-      <span class="val">+ ${value.toFixed(2)}</span>
-    `;
-    historyList.prepend(li);
-
-    // Audio + haptic feedback
-    beep();
-    vibrate();
-
-    setStatus('detected', 'DETECTED ✓');
-    setTimeout(() => {
-      if (isScanning) setStatus('scanning', 'SCANNING…');
-    }, 800);
-  }
-
-  /* ───────────────────────────────────────────────
-     VISUAL FLASH ON DETECTION
-  ─────────────────────────────────────────────── */
-  function flashDetected() {
-    scanBox.classList.add('detected');
-    setTimeout(() => scanBox.classList.remove('detected'), 600);
-  }
-
-  /* ───────────────────────────────────────────────
-     START CAMERA + SCANNING
-  ─────────────────────────────────────────────── */
-  async function startScanning() {
-    // Resume suspended audio context (required on mobile after user gesture)
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-    setStatus('scanning', 'STARTING…');
-    startBtn.disabled = true;
-
-    try {
-      // Force back camera on mobile
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width:  { ideal: 1280 },
-          height: { ideal: 960 },
-        },
-        audio: false,
-      });
-
-      video.srcObject = stream;
-      await video.play();
-
-      // Init worker if needed
-      if (!worker) {
-        setStatus('scanning', 'LOADING OCR…');
-        await initWorker();
-      }
-
-      isScanning = true;
-      startBtn.textContent = '■ Stop Camera';
-      startBtn.classList.add('stop');
-      startBtn.disabled = false;
-      setStatus('scanning', 'SCANNING…');
-
-      // Scan every 600ms
-      scanInterval = setInterval(scanFrame, 600);
-
-    } catch (err) {
-      console.error('Camera error:', err);
-      setStatus('error', 'CAM ERROR');
-      startBtn.disabled = false;
-      alert('Camera access failed.\n\nPlease allow camera permission and try again.\n\n' + err.message);
-    }
-  }
-
-  /* ───────────────────────────────────────────────
-     STOP SCANNING
-  ─────────────────────────────────────────────── */
-  function stopScanning() {
-    isScanning = false;
-    isProcessing = false;
-
-    clearInterval(scanInterval);
-    scanInterval = null;
-
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-
-    video.srcObject = null;
-    lastScannedValue = null;  // reset duplicate guard on stop
-
-    startBtn.textContent = '▶ Start Camera';
-    startBtn.classList.remove('stop');
-    setStatus('ready', 'READY');
-  }
-
-  /* ───────────────────────────────────────────────
-     CLEAR HISTORY
-  ─────────────────────────────────────────────── */
-  function clearHistory() {
-    runningTotal = 0;
-    ticketCount  = 0;
-    scanHistory  = [];
-    lastScannedValue = null;
-    totalDisplay.textContent = '0.00';
-    countDisplay.textContent = '0';
-    historyList.innerHTML    = '';
-  }
-
-  /* ───────────────────────────────────────────────
-     EVENT LISTENERS
-  ─────────────────────────────────────────────── */
-  startBtn.addEventListener('click', () => {
-    if (isScanning) {
-      stopScanning();
-    } else {
-      startScanning();
-    }
+  // pop
+  [totalDisplay, countDisplay].forEach(el => {
+    el.classList.add('pop');
+    setTimeout(() => el.classList.remove('pop'), 200);
   });
 
-  clearBtn.addEventListener('click', clearHistory);
+  // history item
+  const li = document.createElement('li');
+  li.innerHTML = `
+    <span class="idx">#${ticketCount}</span>
+    <span>${entry.ts}</span>
+    <span style="color:#1e2d3d">conf:${entry.conf}%</span>
+    <span class="val">+${value.toFixed(2)}</span>`;
+  historyList.prepend(li);
+
+  // flash scan box
+  szBorder.classList.add('hit');
+  setTimeout(() => szBorder.classList.remove('hit'), 500);
+
+  setStatus('dt', 'DETECTED ✓');
+  setTimeout(() => { if(isScanning) setStatus('sc', 'SCANNING…'); }, 900);
+
+  beep(); vibrate();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   START / STOP
+═══════════════════════════════════════════════════════════ */
+async function startScanning() {
+  if (AC.state === 'suspended') await AC.resume();
+  startBtn.disabled = true;
+  setStatus('sc', 'INIT…');
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 },
+      }, audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+
+    if (!worker) {
+      setStatus('sc', 'LOADING OCR…');
+      await initWorker();
+    }
+
+    isScanning = true;
+    consecutiveMisses = 0;
+    currentInterval = 500;
+    startBtn.textContent = '■ STOP CAMERA';
+    startBtn.classList.add('stop');
+    startBtn.disabled = false;
+    setStatus('sc', 'SCANNING…');
+    fpsLast = performance.now(); fpsFrames = 0;
+
+    scanInterval = setInterval(scanOnce, currentInterval);
+
+  } catch(err) {
+    setStatus('er', 'CAM ERROR');
+    startBtn.disabled = false;
+    alert('فشل الوصول للكاميرا:\n' + err.message);
+  }
+}
+
+function stopScanning() {
+  isScanning = false; isOCRBusy = false;
+  clearInterval(scanInterval); scanInterval = null;
+  stream?.getTracks().forEach(t => t.stop());
+  stream = null; video.srcObject = null;
+  lastValue = null;
+  camWrap.classList.remove('scanning');
+  startBtn.textContent = '▶ START CAMERA';
+  startBtn.classList.remove('stop');
+  setStatus('', 'READY');
+  fpsChip.textContent = '0 fps';
+  confBar.style.width = '0';
+}
+
+startBtn.addEventListener('click', () => isScanning ? stopScanning() : startScanning());
+document.getElementById('clearBtn').addEventListener('click', () => {
+  runningTotal = ticketCount = 0;
+  scanHistory = []; lastValue = null;
+  totalDisplay.textContent = '0.00';
+  countDisplay.textContent = '0';
+  avgDisplay.textContent   = '—';
+  historyList.innerHTML = '';
+});
+
+/* ═══════════════════════════════════════════════════════════
+   EXPORT — build report text
+═══════════════════════════════════════════════════════════ */
+function buildReport() {
+  const now  = new Date().toLocaleString('ar-DZ');
+  const avg  = ticketCount > 0 ? (runningTotal/ticketCount).toFixed(2) : '—';
+  const min  = scanHistory.length ? Math.min(...scanHistory.map(e=>e.value)).toFixed(2) : '—';
+  const max  = scanHistory.length ? Math.max(...scanHistory.map(e=>e.value)).toFixed(2) : '—';
+
+  let lines = [
+    '══════════════════════════════════════',
+    '   NET SCANNER PRO — OMAR MLW 2026   ',
+    '══════════════════════════════════════',
+    `التاريخ/الوقت : ${now}`,
+    `عدد التذاكر  : ${ticketCount}`,
+    `الإجمالي     : ${runningTotal.toFixed(2)}`,
+    `المتوسط      : ${avg}`,
+    `الأعلى       : ${max}`,
+    `الأدنى       : ${min}`,
+    '──────────────────────────────────────',
+    'التفاصيل:',
+    '',
+    ...scanHistory.slice().reverse().map(e =>
+      `#${String(e.index).padStart(3,'0')}  ${e.ts}  NET: ${e.value.toFixed(2).padStart(10)}  (ثقة: ${e.conf}%)`
+    ),
+    '',
+    '══════════════════════════════════════',
+  ];
+  return lines.join('\n');
+}
+
+function refreshPreview() {
+  document.getElementById('exportPreview').textContent =
+    ticketCount > 0 ? buildReport() : '— لا توجد بيانات بعد —';
+}
+
+document.getElementById('dlTxt').addEventListener('click', () => {
+  if (!ticketCount) { alert('لا توجد بيانات للتصدير.'); return; }
+  const blob = new Blob([buildReport()], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `net_scan_${Date.now()}.txt`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('cpTxt').addEventListener('click', () => {
+  if (!ticketCount) { alert('لا توجد بيانات.'); return; }
+  navigator.clipboard?.writeText(buildReport()).then(() => alert('تم النسخ ✓'));
+});
+
+document.getElementById('previewBtn').addEventListener('click', refreshPreview);
+
+/* ═══════════════════════════════════════════════════════════
+   CLAUDE AI ANALYSIS
+═══════════════════════════════════════════════════════════ */
+const aiBtn    = document.getElementById('aiBtn');
+const aiOutput = document.getElementById('aiOutput');
+const aiPrompt = document.getElementById('aiPrompt');
+
+// Quick question buttons
+document.querySelectorAll('.qq').forEach(btn => {
+  btn.addEventListener('click', () => {
+    aiPrompt.value = btn.dataset.q;
+  });
+});
+
+aiBtn.addEventListener('click', async () => {
+  if (!ticketCount) { aiOutput.innerHTML = '<span class="ai-warn">⚠ قم بمسح تذاكر أولاً</span>'; return; }
+  const question = aiPrompt.value.trim() || 'حلل هذه البيانات وأعطني ملخصاً شاملاً';
+
+  aiBtn.disabled = true;
+  aiOutput.innerHTML = '<span class="ai-thinking">⏳ Claude يحلل البيانات…</span>';
+
+  /* Build data context for Claude */
+  const dataContext = `
+بيانات المسح:
+- عدد التذاكر: ${ticketCount}
+- الإجمالي: ${runningTotal.toFixed(2)}
+- المتوسط: ${ticketCount > 0 ? (runningTotal/ticketCount).toFixed(2) : 'N/A'}
+- القيم (آخر 50): ${scanHistory.slice(0,50).map(e=>e.value.toFixed(2)).join(', ')}
+- أعلى قيمة: ${Math.max(...scanHistory.map(e=>e.value)).toFixed(2)}
+- أدنى قيمة: ${Math.min(...scanHistory.map(e=>e.value)).toFixed(2)}
+
+السؤال: ${question}
+
+أجب بالعربية، بشكل مختصر ومباشر، مع تمييز الأرقام المهمة. استخدم رموز تعبيرية للتنظيم البصري.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: dataContext }]
+      })
+    });
+
+    const data = await resp.json();
+    const text = data.content?.find(b => b.type === 'text')?.text || 'لا يوجد رد';
+
+    // Simple formatting
+    const formatted = text
+      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--g)">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em style="color:var(--b)">$1</em>')
+      .replace(/⚠/g, '<span class="ai-warn">⚠</span>')
+      .replace(/✅|✓/g, '<span class="ai-highlight">✓</span>');
+
+    aiOutput.innerHTML = formatted;
+
+  } catch(err) {
+    aiOutput.innerHTML = `<span class="ai-error">❌ خطأ في الاتصال بـ Claude API\n${err.message}</span>`;
+  }
+
+  aiBtn.disabled = false;
+});
 </script>
 </body>
 </html>
