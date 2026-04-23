@@ -2,92 +2,91 @@
 <html lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>Scanner</title>
+<title>Fast Scanner</title>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
 <style>
 body { text-align:center; font-family:Arial; direction:rtl; }
-video { width:300px; border:2px solid #333; }
-button { padding:10px 20px; margin:10px; font-size:18px; cursor:pointer; }
-#total { font-size:24px; color:green; }
+video { width:320px; border:2px solid #333; }
+#total { font-size:26px; color:green; margin-top:20px; }
 </style>
 </head>
 
 <body>
 
-<h2>📷 قراءة التذاكر</h2>
+<h2>⚡ قراءة سريعة (Net)</h2>
 
-<button onclick="startCamera()">تشغيل الكاميرا</button>
-<button onclick="capture()">التقاط</button>
+<button onclick="startCamera()">تشغيل</button>
 
 <br>
 <video id="video" autoplay playsinline></video>
 
-<div id="status"></div>
-<div id="result"></div>
 <div id="total">المجموع: 0</div>
+
+<audio id="beep">
+<source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg">
+</audio>
 
 <script>
 let total = 0;
-let stream = null;
+let lastValue = null;
 
-function startCamera(){
-document.getElementById("status").innerText = "جاري تشغيل الكاميرا...";
-
-navigator.mediaDevices.getUserMedia({ video:true })
-.then(s=>{
-stream = s;
-document.getElementById("video").srcObject = s;
-document.getElementById("status").innerText = "✅ الكاميرا تعمل";
-})
-.catch(err=>{
-document.getElementById("status").innerText = "❌ فشل الكاميرا: " + err;
-alert("لازم تفتح الصفحة عبر https أو localhost وتسمح بالكاميرا");
+async function startCamera(){
+const stream = await navigator.mediaDevices.getUserMedia({
+video: { facingMode: "environment" }
 });
+document.getElementById("video").srcObject = stream;
+
+fastScan();
 }
 
-function capture(){
-if(!stream){
-alert("شغل الكاميرا أولا");
-return;
-}
-
-document.getElementById("status").innerText = "📸 يتم التقاط الصورة...";
-
+function fastScan(){
 const video = document.getElementById("video");
+
+setInterval(() => {
+
+if(video.readyState !== 4) return;
+
+// ⚡ Canvas صغير (تسريع)
 const canvas = document.createElement("canvas");
 const ctx = canvas.getContext("2d");
 
-canvas.width = video.videoWidth;
-canvas.height = video.videoHeight;
-ctx.drawImage(video,0,0);
+// نقص فقط الجزء السفلي (مكان Net تقريبا)
+canvas.width = 200;
+canvas.height = 100;
 
-document.getElementById("status").innerText = "🤖 جاري قراءة النص...";
+ctx.drawImage(video,
+0, video.videoHeight * 0.6, // قص من الأسفل
+video.videoWidth, video.videoHeight * 0.4,
+0, 0, 200, 100);
 
-Tesseract.recognize(canvas,'eng')
+// ⚡ قراءة سريعة
+Tesseract.recognize(canvas, 'eng', {
+tessedit_char_whitelist: '0123456789Net'
+})
 .then(({data:{text}})=>{
 
-document.getElementById("result").innerText = text;
-
-// استخراج Net
 let match = text.match(/Net[:\s]*([\d]+)/i);
 
 if(match){
 let value = parseInt(match[1]);
+
+if(value !== lastValue){
+lastValue = value;
 total += value;
+
 document.getElementById("total").innerText = "المجموع: " + total;
-}else{
-alert("⚠️ لم يتم العثور على Net");
+
+// 🔊 صوت
+document.getElementById("beep").play();
+}
 }
 
-document.getElementById("status").innerText = "✅ تم التحليل";
-
-})
-.catch(err=>{
-document.getElementById("status").innerText = "❌ خطأ OCR";
-console.error(err);
 });
+
+}, 700); // ⚡ أسرع (0.7 ثانية)
+
 }
 </script>
 
