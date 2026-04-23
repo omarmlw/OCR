@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<title>SMTRA NET SCANNER — OMAR MLW</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<title>SMTRA SCANNER v4</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --g:#00ff88;--g2:#00c96a;--b:#00d4ff;--r:#ff4455;--y:#ffd000;
@@ -16,11 +15,6 @@
 html,body{height:100%;background:var(--bg);color:var(--txt);font-family:var(--mono);overflow-x:hidden}
 body{display:flex;flex-direction:column;align-items:center;padding:10px 10px 30px;gap:10px;min-height:100dvh}
 
-/* grain */
-body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.35;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")}
-
-/* header */
 header{width:100%;max-width:520px;display:flex;align-items:center;justify-content:space-between;
   border-bottom:1px solid var(--brd);padding-bottom:10px}
 header h1{font-family:var(--orb);font-size:1.1rem;font-weight:900;letter-spacing:2px;color:var(--g);
@@ -30,117 +24,138 @@ header h1{font-family:var(--orb);font-size:1.1rem;font-weight:900;letter-spacing
 /* tabs */
 .tabs{width:100%;max-width:520px;display:grid;grid-template-columns:repeat(3,1fr);
   background:var(--p1);border:1px solid var(--brd);border-radius:6px;overflow:hidden}
-.tab{font-family:var(--orb);font-size:.55rem;letter-spacing:1.2px;padding:9px 2px;
+.tab{font-family:var(--orb);font-size:.55rem;letter-spacing:1px;padding:9px 2px;
   text-align:center;cursor:pointer;background:none;border:none;color:#2a3a4a;transition:color .2s,background .2s}
 .tab.active{color:var(--g);background:rgba(0,255,136,.05);border-bottom:2px solid var(--g)}
-.tab:hover:not(.active){color:var(--txt)}
 
 /* panels */
 .panel{display:none;width:100%;max-width:520px;flex-direction:column;gap:10px}
 .panel.active{display:flex}
 
-/* ═══ SCANNER ═══ */
-.cam-wrap{position:relative;width:100%;aspect-ratio:16/10;
-  background:#020304;border:1px solid var(--brd);border-radius:8px;overflow:hidden}
-#video{width:100%;height:100%;object-fit:cover;display:block}
+/* ── camera ── */
+.cam-wrap{position:relative;width:100%;aspect-ratio:4/3;
+  background:#020304;border:1px solid var(--brd);border-radius:8px;overflow:hidden;
+  cursor:pointer;-webkit-tap-highlight-color:transparent}
+#video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
 
-/* scan zone — positioned at ~70% height where Net: line is */
-.scan-zone{position:absolute;left:2%;right:2%;pointer-events:none;
-  top:62%;height:14%;transform:translateY(-50%)}
-.sz-border{position:absolute;inset:0;border:2px solid var(--g);border-radius:3px;
-  box-shadow:0 0 0 4000px rgba(0,0,0,.52),inset 0 0 14px rgba(0,255,136,.1);transition:border-color .15s,box-shadow .15s}
-.sz-border.hit{border-color:var(--b);box-shadow:0 0 0 4000px rgba(0,0,0,.52),inset 0 0 28px rgba(0,212,255,.28)}
-.c{position:absolute;width:14px;height:14px;border-color:inherit;border-style:solid;transition:inherit}
-.c.tl{top:-2px;left:-2px;border-width:3px 0 0 3px}
-.c.tr{top:-2px;right:-2px;border-width:3px 3px 0 0}
-.c.br{bottom:-2px;right:-2px;border-width:0 3px 3px 0}
-.c.bl{bottom:-2px;left:-2px;border-width:0 0 3px 3px}
-.scan-line{position:absolute;left:2px;right:2px;height:2px;top:0;
-  background:linear-gradient(90deg,transparent,var(--g),transparent);opacity:0;animation:sw 1s ease-in-out infinite}
+/* scan frame overlay */
+.frame{position:absolute;inset:8px;border:2px solid rgba(0,255,136,.25);border-radius:6px;pointer-events:none}
+.frame.flash{border-color:var(--b);box-shadow:inset 0 0 40px rgba(0,212,255,.2);transition:none}
+
+/* corner ticks */
+.frame::before,.frame::after,.tick-b{content:'';position:absolute;border-color:var(--g);border-style:solid}
+.frame::before{top:-2px;left:-2px;width:20px;height:20px;border-width:3px 0 0 3px}
+.frame::after {top:-2px;right:-2px;width:20px;height:20px;border-width:3px 3px 0 0}
+.tick-b{bottom:-2px;right:-2px;width:20px;height:20px;border-width:0 3px 3px 0}
+
+/* scan line - visible when scanning */
+.scan-line{position:absolute;left:0;right:0;height:3px;top:0;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--g) 50%,transparent);
+  opacity:0;animation:sw 1.2s ease-in-out infinite}
 .scanning .scan-line{opacity:1}
-@keyframes sw{0%{top:0}50%{top:calc(100% - 2px)}100%{top:0}}
+@keyframes sw{0%{top:0}50%{top:calc(100% - 3px)}100%{top:0}}
 
-/* HUD */
-.cam-hud{position:absolute;top:6px;left:6px;right:6px;display:flex;justify-content:space-between;pointer-events:none}
-.hud-chip{font-size:.55rem;letter-spacing:1.5px;background:rgba(7,9,12,.82);border:1px solid var(--brd);
-  padding:3px 9px;border-radius:20px;backdrop-filter:blur(4px);white-space:nowrap}
-#statusChip.sc{color:var(--g);border-color:rgba(0,255,136,.4)}
-#statusChip.dt{color:var(--b);border-color:rgba(0,212,255,.4)}
-#statusChip.er{color:var(--r);border-color:rgba(255,68,85,.4)}
-#statusChip.dup{color:var(--y);border-color:rgba(255,208,0,.4)}
-#fpsChip{color:#2a3a4a}
+/* tap hint */
+.tap-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  font-size:.6rem;letter-spacing:2px;color:rgba(255,255,255,.4);pointer-events:none;
+  white-space:nowrap;transition:opacity .3s}
 
-/* guide labels on camera */
-.cam-label{position:absolute;font-size:.52rem;letter-spacing:1.5px;color:rgba(0,255,136,.5);pointer-events:none}
-.lbl-net{bottom:calc(38% + 2px);left:4%}
-.lbl-align{bottom:2%;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.3);letter-spacing:1px}
+/* HUD top */
+.cam-hud{position:absolute;top:8px;left:8px;right:8px;
+  display:flex;justify-content:space-between;pointer-events:none}
+.chip{font-size:.58rem;letter-spacing:1.5px;background:rgba(7,9,12,.85);
+  border:1px solid var(--brd);padding:4px 10px;border-radius:20px;backdrop-filter:blur(6px)}
+#stChip.sc{color:var(--g);border-color:rgba(0,255,136,.4)}
+#stChip.pr{color:var(--b);border-color:rgba(0,212,255,.4)}
+#stChip.ok{color:var(--g);border-color:rgba(0,255,136,.6)}
+#stChip.dup{color:var(--y);border-color:rgba(255,208,0,.5)}
+#stChip.er{color:var(--r);border-color:rgba(255,68,85,.4)}
+
+/* spinner inside chip */
+.spin{display:inline-block;animation:rot .6s linear infinite;margin-left:4px}
+@keyframes rot{to{transform:rotate(360deg)}}
 
 /* conf bar */
-.conf-bar-wrap{position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,.04)}
-.conf-bar{height:100%;width:0;background:var(--g);transition:width .25s,background .25s}
+.cbar-wrap{position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,.04)}
+.cbar{height:100%;width:0;background:var(--g);transition:width .3s,background .3s}
 
-/* last ticket preview */
-.ticket-preview{
-  background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:10px 14px;
-  display:flex;flex-direction:column;gap:4px;
-}
-.tp-row{display:flex;justify-content:space-between;align-items:center;font-size:.7rem}
-.tp-label{color:#2a3a4a;letter-spacing:1.5px;font-size:.55rem}
-.tp-value{color:var(--txt)}
-.tp-value.big{font-family:var(--orb);font-size:1.6rem;color:var(--g);
-  text-shadow:0 0 16px rgba(0,255,136,.3);font-weight:700}
-.tp-value.ticket-no{color:var(--b)}
-.dup-badge{display:none;font-size:.55rem;letter-spacing:1.5px;color:var(--y);
+/* ── last ticket preview ── */
+.ticket-card{background:var(--p1);border:1px solid var(--brd);border-radius:8px;padding:12px 16px}
+.tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+.tc-field{display:flex;flex-direction:column;gap:2px}
+.tc-field.span2{grid-column:1/-1}
+.tf-lbl{font-size:.48rem;letter-spacing:2.5px;color:#1e2d3d;text-transform:uppercase}
+.tf-val{font-size:.85rem;color:var(--txt)}
+.tf-val.big{font-family:var(--orb);font-size:2rem;font-weight:700;color:var(--g);
+  text-shadow:0 0 20px rgba(0,255,136,.35);line-height:1.1}
+.tf-val.tno{color:var(--b)}
+.dup-pill{display:none;font-size:.5rem;letter-spacing:1.5px;color:var(--y);
   background:rgba(255,208,0,.1);border:1px solid rgba(255,208,0,.3);
-  padding:2px 8px;border-radius:10px}
-.dup-badge.show{display:inline-block}
+  padding:2px 9px;border-radius:10px;width:fit-content}
+.dup-pill.show{display:block}
 
-/* totals */
+/* ── totals row ── */
 .totals{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.tc{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:10px 10px}
-.tc-lbl{font-size:.48rem;letter-spacing:2px;color:#1e2d3d;margin-bottom:4px;text-transform:uppercase}
-.tc-val{font-family:var(--orb);font-size:1.35rem;font-weight:700;line-height:1;
+.tot{background:var(--p1);border:1px solid var(--brd);border-radius:7px;padding:10px 10px}
+.tot-lbl{font-size:.46rem;letter-spacing:2px;color:#1e2d3d;text-transform:uppercase;margin-bottom:4px}
+.tot-val{font-family:var(--orb);font-size:1.3rem;font-weight:700;line-height:1;
   color:var(--g);text-shadow:0 0 14px rgba(0,255,136,.25);transition:transform .15s}
-.tc-val.pop{transform:scale(1.1)}
-.tc-val.b{color:var(--b);text-shadow:0 0 14px rgba(0,212,255,.25)}
-.tc-val.y{color:var(--y);text-shadow:0 0 14px rgba(255,208,0,.25)}
+.tot-val.pop{transform:scale(1.12)}
+.tot-val.b{color:var(--b);text-shadow:0 0 14px rgba(0,212,255,.25)}
+.tot-val.y{color:var(--y);text-shadow:0 0 14px rgba(255,208,0,.25)}
 
-/* start btn */
-.start-btn{width:100%;font-family:var(--orb);font-size:.95rem;font-weight:700;letter-spacing:3px;
-  padding:13px;border-radius:6px;cursor:pointer;background:transparent;
-  border:2px solid var(--g);color:var(--g);transition:background .2s,color .2s,box-shadow .2s}
-.start-btn:hover,.start-btn:active{background:var(--g);color:#07090c;box-shadow:0 0 24px rgba(0,255,136,.4)}
-.start-btn.stop{border-color:var(--r);color:var(--r)}
-.start-btn.stop:hover,.start-btn.stop:active{background:var(--r);color:#fff;box-shadow:0 0 24px rgba(255,68,85,.4)}
+/* ── big scan button ── */
+.scan-btn{width:100%;font-family:var(--orb);font-size:1rem;font-weight:700;
+  letter-spacing:3px;padding:15px;border-radius:8px;cursor:pointer;
+  background:transparent;border:2px solid var(--g);color:var(--g);
+  transition:background .15s,color .15s,box-shadow .15s;text-transform:uppercase;
+  -webkit-tap-highlight-color:transparent}
+.scan-btn:active{background:var(--g);color:#07090c;box-shadow:0 0 28px rgba(0,255,136,.5)}
+.scan-btn.stop{border-color:var(--r);color:var(--r)}
+.scan-btn.stop:active{background:var(--r);color:#fff}
+.scan-btn:disabled{opacity:.4;cursor:not-allowed}
 
-/* history */
-.history-box{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:10px 12px}
+/* ── capture btn (manual frame) ── */
+.capture-btn{width:100%;font-family:var(--orb);font-size:.8rem;letter-spacing:2px;
+  padding:12px;border-radius:7px;cursor:pointer;background:rgba(0,212,255,.08);
+  border:1px solid var(--b);color:var(--b);transition:background .15s,box-shadow .15s;
+  text-transform:uppercase;-webkit-tap-highlight-color:transparent}
+.capture-btn:active{background:rgba(0,212,255,.25);box-shadow:0 0 20px rgba(0,212,255,.3)}
+.capture-btn:disabled{opacity:.3;cursor:not-allowed}
+
+/* ── mode toggle ── */
+.mode-row{display:flex;gap:8px;align-items:center}
+.mode-lbl{font-size:.55rem;letter-spacing:2px;color:#2a3a4a;flex:1}
+.toggle-wrap{display:flex;background:var(--p2);border:1px solid var(--brd);border-radius:4px;overflow:hidden}
+.toggle-opt{font-size:.55rem;letter-spacing:1px;padding:5px 10px;cursor:pointer;
+  background:none;border:none;color:#2a3a4a;transition:color .2s,background .2s}
+.toggle-opt.active{color:var(--g);background:rgba(0,255,136,.08)}
+
+/* ── history ── */
+.history-box{background:var(--p1);border:1px solid var(--brd);border-radius:7px;padding:10px 12px}
 .hb-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.hb-title{font-size:.52rem;letter-spacing:3px;color:#2a3a4a;text-transform:uppercase}
-.ghost-btn{font-family:var(--mono);font-size:.52rem;letter-spacing:1.5px;background:none;
-  border:1px solid var(--brd);color:#2a3a4a;padding:3px 10px;border-radius:3px;cursor:pointer;
-  transition:color .2s,border-color .2s;text-transform:uppercase}
+.hb-title{font-size:.5rem;letter-spacing:3px;color:#2a3a4a;text-transform:uppercase}
+.ghost-btn{font-family:var(--mono);font-size:.5rem;letter-spacing:1.5px;background:none;
+  border:1px solid var(--brd);color:#2a3a4a;padding:3px 10px;border-radius:3px;
+  cursor:pointer;transition:color .2s,border-color .2s;text-transform:uppercase}
 .ghost-btn:hover{color:var(--r);border-color:rgba(255,68,85,.4)}
-
-#histList{list-style:none;display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto}
+#histList{list-style:none;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto}
 #histList::-webkit-scrollbar{width:3px}
 #histList::-webkit-scrollbar-thumb{background:var(--brd)}
 #histList li{display:flex;justify-content:space-between;align-items:center;
-  font-size:.7rem;color:#3a5068;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.025);
-  animation:fadeIn .25s ease}
-#histList li .val{color:var(--g2)}
-#histList li .tno{color:var(--b);font-size:.6rem}
-#histList li .dup-tag{color:var(--y);font-size:.52rem;background:rgba(255,208,0,.08);
+  font-size:.68rem;color:#3a5068;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.02);
+  animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateX(8px)}to{opacity:1}}
+.val-g{color:var(--g2)} .val-b{color:var(--b)} .val-y{color:var(--y)}
+.dup-tag{font-size:.5rem;color:var(--y);background:rgba(255,208,0,.08);
   border:1px solid rgba(255,208,0,.2);padding:1px 6px;border-radius:8px}
-@keyframes fadeIn{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
 
-/* ═══ AI ═══ */
-.ai-panel{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:14px}
-.ai-lbl{font-size:.52rem;letter-spacing:3px;color:#2a3a4a;margin-bottom:8px;text-transform:uppercase}
+/* ── AI ── */
+.ai-card{background:var(--p1);border:1px solid var(--brd);border-radius:7px;padding:14px}
+.ai-lbl{font-size:.5rem;letter-spacing:3px;color:#2a3a4a;text-transform:uppercase;margin-bottom:8px}
 .quick-qs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.qq{font-family:var(--mono);font-size:.58rem;letter-spacing:.8px;background:none;
-  border:1px solid var(--brd);color:#3a5068;padding:4px 10px;border-radius:20px;
-  cursor:pointer;transition:color .2s,border-color .2s}
+.qq{font-family:var(--mono);font-size:.58rem;background:none;border:1px solid var(--brd);
+  color:#3a5068;padding:4px 10px;border-radius:20px;cursor:pointer;transition:color .2s,border-color .2s}
 .qq:hover{color:var(--b);border-color:rgba(0,212,255,.4)}
 #aiPrompt{width:100%;font-family:var(--mono);font-size:.72rem;background:var(--p2);
   border:1px solid var(--brd);color:var(--txt);padding:9px 12px;border-radius:5px;
@@ -148,28 +163,26 @@ header h1{font-family:var(--orb);font-size:1.1rem;font-weight:900;letter-spacing
 #aiPrompt:focus{border-color:rgba(0,212,255,.4)}
 .ai-btn{width:100%;font-family:var(--orb);font-size:.72rem;letter-spacing:2px;padding:11px;
   border-radius:5px;cursor:pointer;background:transparent;border:1px solid var(--b);
-  color:var(--b);transition:background .2s,color .2s,box-shadow .2s;text-transform:uppercase}
-.ai-btn:hover{background:var(--b);color:#07090c;box-shadow:0 0 18px rgba(0,212,255,.3)}
+  color:var(--b);transition:background .2s,color .2s;text-transform:uppercase}
+.ai-btn:hover{background:var(--b);color:#07090c}
 .ai-btn:disabled{opacity:.3;cursor:not-allowed}
-.ai-output{min-height:100px;max-height:280px;overflow-y:auto;font-size:.78rem;
+.ai-out{min-height:80px;max-height:260px;overflow-y:auto;font-size:.78rem;
   line-height:1.75;color:var(--txt);white-space:pre-wrap;word-break:break-word;margin-top:10px}
-.ai-output::-webkit-scrollbar{width:3px}
-.ai-output::-webkit-scrollbar-thumb{background:var(--brd)}
+.ai-out::-webkit-scrollbar{width:3px}
+.ai-out::-webkit-scrollbar-thumb{background:var(--brd)}
 
-/* ═══ EXPORT ═══ */
-.export-card{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:14px;
+/* ── export ── */
+.ex-card{background:var(--p1);border:1px solid var(--brd);border-radius:7px;padding:14px;
   display:flex;flex-direction:column;gap:10px}
 .ex-row{display:flex;gap:8px;align-items:center}
-.ex-lbl{font-size:.52rem;letter-spacing:2px;color:#2a3a4a;flex:1;text-transform:uppercase}
-.ex-btn{font-family:var(--mono);font-size:.58rem;letter-spacing:1.5px;background:none;
+.ex-lbl{font-size:.5rem;letter-spacing:2px;color:#2a3a4a;flex:1;text-transform:uppercase}
+.ex-btn{font-family:var(--mono);font-size:.58rem;letter-spacing:1px;background:none;
   border:1px solid var(--brd);color:#3a5068;padding:7px 14px;border-radius:4px;
   cursor:pointer;transition:color .2s,border-color .2s,background .2s;text-transform:uppercase}
 .ex-btn:hover{color:var(--g);border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.05)}
-#exportPreview{font-size:.62rem;line-height:1.8;color:#2a3a4a;background:var(--p2);
+#exportPrev{font-size:.6rem;line-height:1.8;color:#2a3a4a;background:var(--p2);
   border:1px solid var(--brd);border-radius:4px;padding:10px;max-height:240px;
   overflow-y:auto;white-space:pre;font-family:var(--mono)}
-#exportPreview::-webkit-scrollbar{width:3px}
-#exportPreview::-webkit-scrollbar-thumb{background:var(--brd)}
 
 #canvas{display:none}
 </style>
@@ -178,7 +191,7 @@ header h1{font-family:var(--orb);font-size:1.1rem;font-weight:900;letter-spacing
 
 <header>
   <h1>SMTRA SCANNER</h1>
-  <div class="ver">BY OMAR MLW — 2026<br>v3.0 · SMTRA FORMAT</div>
+  <div class="ver">BY OMAR MLW — 2026<br>v4 · CLAUDE VISION</div>
 </header>
 
 <div class="tabs">
@@ -187,546 +200,525 @@ header h1{font-family:var(--orb);font-size:1.1rem;font-weight:900;letter-spacing
   <button class="tab" data-tab="export">💾 EXPORT</button>
 </div>
 
-<!-- ══════════════ SCANNER ══════════════ -->
+<!-- ═══ SCANNER ═══ -->
 <div class="panel active" id="panel-scanner">
 
   <div class="cam-wrap" id="camWrap">
     <video id="video" autoplay playsinline muted></video>
-
-    <!-- Scan zone aligned to where "Net:" line appears -->
-    <div class="scan-zone" id="scanZone">
-      <div class="sz-border" id="szBorder">
-        <div class="c tl"></div><div class="c tr"></div>
-        <div class="c br"></div><div class="c bl"></div>
-        <div class="scan-line"></div>
-      </div>
-    </div>
-
-    <div class="cam-label lbl-net">▶ NET LINE</div>
-    <div class="cam-label lbl-align">CENTER TICKET IN FRAME</div>
-
+    <div class="frame" id="frame"><div class="tick-b"></div></div>
+    <div class="scan-line" id="scanLine"></div>
+    <div class="tap-hint" id="tapHint">اضغط SCAN أو انقر على الكاميرا</div>
     <div class="cam-hud">
-      <div class="hud-chip" id="statusChip">READY</div>
-      <div class="hud-chip" id="fpsChip">— fps</div>
+      <div class="chip" id="stChip">READY</div>
+      <div class="chip" id="modeChip">CLAUDE VISION</div>
     </div>
-    <div class="conf-bar-wrap"><div class="conf-bar" id="confBar"></div></div>
+    <div class="cbar-wrap"><div class="cbar" id="cbar"></div></div>
   </div>
 
-  <!-- Last detected ticket -->
-  <div class="ticket-preview" id="ticketPreview">
-    <div class="tp-row">
-      <span class="tp-label">N° TICKET</span>
-      <span class="tp-value ticket-no" id="lastTicketNo">—</span>
-      <span class="dup-badge" id="dupBadge">⚠ DUPLICATE</span>
-    </div>
-    <div class="tp-row">
-      <span class="tp-label">DATE</span>
-      <span class="tp-value" id="lastDate">—</span>
-    </div>
-    <div class="tp-row">
-      <span class="tp-label">NET (Kg)</span>
-      <span class="tp-value big" id="lastNet">—</span>
+  <!-- Last ticket -->
+  <div class="ticket-card">
+    <div class="tc-grid">
+      <div class="tc-field">
+        <span class="tf-lbl">N° TICKET</span>
+        <span class="tf-val tno" id="lastNo">—</span>
+      </div>
+      <div class="tc-field">
+        <span class="tf-lbl">DATE</span>
+        <span class="tf-val" id="lastDate">—</span>
+      </div>
+      <div class="tc-field span2">
+        <span class="tf-lbl">NET (Kg)</span>
+        <span class="tf-val big" id="lastNet">—</span>
+        <span class="dup-pill" id="dupPill">⚠ DOUBLON IGNORÉ</span>
+      </div>
     </div>
   </div>
 
   <!-- Totals -->
   <div class="totals">
-    <div class="tc"><div class="tc-lbl">TOTAL NET (Kg)</div><div class="tc-val" id="totalDisplay">0</div></div>
-    <div class="tc"><div class="tc-lbl">TICKETS</div><div class="tc-val b" id="countDisplay">0</div></div>
-    <div class="tc"><div class="tc-lbl">AVERAGE</div><div class="tc-val y" id="avgDisplay">—</div></div>
+    <div class="tot"><div class="tot-lbl">TOTAL NET</div><div class="tot-val" id="totalKg">0</div></div>
+    <div class="tot"><div class="tot-lbl">TICKETS</div><div class="tot-val b" id="totalCount">0</div></div>
+    <div class="tot"><div class="tot-lbl">MOYENNE</div><div class="tot-val y" id="avgKg">—</div></div>
   </div>
 
-  <button class="start-btn" id="startBtn">▶ START CAMERA</button>
+  <!-- Buttons -->
+  <button class="scan-btn" id="startBtn">▶ DÉMARRER</button>
+  <button class="capture-btn" id="captureBtn" disabled>📷 SCANNER CETTE TICHETTE</button>
 
+  <!-- History -->
   <div class="history-box">
     <div class="hb-hdr">
-      <span class="hb-title">SCAN HISTORY</span>
-      <button class="ghost-btn" id="clearBtn">CLEAR ALL</button>
+      <span class="hb-title">HISTORIQUE</span>
+      <button class="ghost-btn" id="clearBtn">EFFACER</button>
     </div>
     <ul id="histList"></ul>
   </div>
 </div>
 
-<!-- ══════════════ AI ══════════════ -->
+<!-- ═══ AI ═══ -->
 <div class="panel" id="panel-ai">
-  <div class="ai-panel">
-    <div class="ai-lbl">QUICK ANALYSIS</div>
+  <div class="ai-card">
+    <div class="ai-lbl">QUESTIONS RAPIDES</div>
     <div class="quick-qs">
-      <button class="qq" data-q="حلل البيانات وأعطني ملخصاً شاملاً مع الإجمالي والمتوسط">📊 ملخص</button>
-      <button class="qq" data-q="هل توجد قيم شاذة أو مشبوهة في قيم Net؟ حدد أرقام التذاكر المشبوهة">🔍 شذوذات</button>
-      <button class="qq" data-q="أعطني إحصاءات: الأعلى، الأدنى، المتوسط، والانحراف المعياري">📈 إحصاء</button>
-      <button class="qq" data-q="هل يوجد تكرار في أرقام التذاكر؟ وهل البيانات منطقية؟">✅ تحقق</button>
-      <button class="qq" data-q="حوّل الإجمالي من Kg إلى طن وقدّر عدد الرحلات اليومية">🚛 تقدير</button>
+      <button class="qq" data-q="حلل البيانات وأعطني ملخصاً شاملاً مع الإجمالي بالطن">📊 ملخص</button>
+      <button class="qq" data-q="هل توجد قيم شاذة أو مشبوهة؟ حدد أرقام التذاكر">🔍 شذوذات</button>
+      <button class="qq" data-q="أعطني إحصاءات كاملة: أعلى، أدنى، متوسط، انحراف معياري">📈 إحصاء</button>
+      <button class="qq" data-q="هل البيانات منطقية لشاحنات نقل BB؟ قيّم الأوزان">🚛 تقييم</button>
     </div>
-    <div class="ai-lbl">CUSTOM PROMPT</div>
-    <textarea id="aiPrompt" placeholder="اكتب سؤالك عن البيانات..."></textarea>
-    <button class="ai-btn" id="aiBtn">🤖 ANALYZE WITH CLAUDE AI</button>
-    <div class="ai-output" id="aiOutput"><span style="color:#1e2d3d">— في انتظار التحليل —</span></div>
+    <div class="ai-lbl">سؤال مخصص</div>
+    <textarea id="aiPrompt" placeholder="اكتب سؤالك..."></textarea>
+    <button class="ai-btn" id="aiAnalyzeBtn">🤖 ANALYSER AVEC CLAUDE</button>
+    <div class="ai-out" id="aiOut"><span style="color:#1e2d3d">— في انتظار التحليل —</span></div>
   </div>
 </div>
 
-<!-- ══════════════ EXPORT ══════════════ -->
+<!-- ═══ EXPORT ═══ -->
 <div class="panel" id="panel-export">
-  <div class="export-card">
-    <div class="ex-row"><div class="ex-lbl">📄 تحميل كـ TXT</div><button class="ex-btn" id="dlTxt">DOWNLOAD</button></div>
-    <div class="ex-row"><div class="ex-lbl">📋 نسخ للحافظة</div><button class="ex-btn" id="cpTxt">COPY</button></div>
+  <div class="ex-card">
+    <div class="ex-row"><div class="ex-lbl">📄 تحميل TXT</div><button class="ex-btn" id="dlBtn">DOWNLOAD</button></div>
+    <div class="ex-row"><div class="ex-lbl">📋 نسخ للحافظة</div><button class="ex-btn" id="cpBtn">COPY</button></div>
     <div class="ex-row"><div class="ex-lbl">🔄 تحديث المعاينة</div><button class="ex-btn" id="prevBtn">REFRESH</button></div>
-    <div class="ai-lbl" style="margin-top:4px">FILE PREVIEW</div>
-    <pre id="exportPreview">— لا توجد بيانات —</pre>
+    <div class="ai-lbl" style="margin-top:4px">APERÇU</div>
+    <pre id="exportPrev">— لا توجد بيانات —</pre>
   </div>
 </div>
 
 <canvas id="canvas"></canvas>
 
 <script>
-/* ══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    STATE
-══════════════════════════════════════════════════ */
-let stream = null, worker = null, scanInterval = null;
-let isScanning = false, isOCRBusy = false;
-let runningTotal = 0, ticketCount = 0;
-let currentInterval = 500;
-let consecutiveMisses = 0;
+═══════════════════════════════════════════ */
+let stream      = null;
+let isRunning   = false;   // camera on
+let isProcessing= false;   // API call in progress
+let autoMode    = true;    // auto scan every N seconds
+let autoTimer   = null;
 
-// Dedup store: key = "ticketNo|date"
-const scannedKeys = new Set();
-let scanHistory = [];   // [{index,ticketNo,date,net,ts,conf,isDup}]
+let runningTotal= 0;
+let ticketCount = 0;
+const scannedKeys = new Set();  // "ticketNo|date"
+let scanHistory   = [];
 
-// FPS
-let fpsF = 0, fpsT = performance.now();
+/* ═══════════════════════════════════════════
+   AUDIO — initialised on first user gesture
+═══════════════════════════════════════════ */
+let AC = null;
 
-/* ══════════════════════════════════════════════════
+function initAudio() {
+  if (AC) return;
+  AC = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playTone(freq, dur, vol=0.3) {
+  if (!AC) return;
+  try {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.connect(g); g.connect(AC.destination);
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+    o.start(); o.stop(AC.currentTime + dur);
+  } catch(e){}
+}
+
+function beepOK()  { playTone(1200,.08,.35); setTimeout(()=>playTone(1600,.1,.3),90); }
+function beepDup() { playTone(400,.08,.25);  setTimeout(()=>playTone(300,.1,.2),90); }
+function beepErr() { playTone(200,.3,.2); }
+
+const vib = p => navigator.vibrate?.(p);
+
+/* ═══════════════════════════════════════════
    ELEMENTS
-══════════════════════════════════════════════════ */
-const video        = document.getElementById('video');
-const canvas       = document.getElementById('canvas');
-const ctx          = canvas.getContext('2d', {willReadFrequently:true});
-const startBtn     = document.getElementById('startBtn');
-const totalDisplay = document.getElementById('totalDisplay');
-const countDisplay = document.getElementById('countDisplay');
-const avgDisplay   = document.getElementById('avgDisplay');
-const histList     = document.getElementById('histList');
-const statusChip   = document.getElementById('statusChip');
-const fpsChip      = document.getElementById('fpsChip');
-const confBar      = document.getElementById('confBar');
-const szBorder     = document.getElementById('szBorder');
-const camWrap      = document.getElementById('camWrap');
-const lastTicketNo = document.getElementById('lastTicketNo');
-const lastDateEl   = document.getElementById('lastDate');
-const lastNetEl    = document.getElementById('lastNet');
-const dupBadge     = document.getElementById('dupBadge');
+═══════════════════════════════════════════ */
+const video      = document.getElementById('video');
+const canvas     = document.getElementById('canvas');
+const ctx        = canvas.getContext('2d',{willReadFrequently:true});
+const startBtn   = document.getElementById('startBtn');
+const captureBtn = document.getElementById('captureBtn');
+const camWrap    = document.getElementById('camWrap');
+const stChip     = document.getElementById('stChip');
+const frame      = document.getElementById('frame');
+const scanLine   = document.getElementById('scanLine');
+const tapHint    = document.getElementById('tapHint');
+const cbar       = document.getElementById('cbar');
 
-/* ══════════════════════════════════════════════════
+const lastNoEl   = document.getElementById('lastNo');
+const lastDateEl = document.getElementById('lastDate');
+const lastNetEl  = document.getElementById('lastNet');
+const dupPill    = document.getElementById('dupPill');
+
+const totalKg    = document.getElementById('totalKg');
+const totalCount = document.getElementById('totalCount');
+const avgKg      = document.getElementById('avgKg');
+const histList   = document.getElementById('histList');
+
+/* ═══════════════════════════════════════════
    TABS
-══════════════════════════════════════════════════ */
+═══════════════════════════════════════════ */
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  document.getElementById('panel-' + t.dataset.tab).classList.add('active');
-  if (t.dataset.tab === 'export') refreshPreview();
+  document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  if(t.dataset.tab==='export') refreshPreview();
 }));
 
-/* ══════════════════════════════════════════════════
-   AUDIO
-══════════════════════════════════════════════════ */
-const AC = new (window.AudioContext || window.webkitAudioContext)();
-function beep(freq=1300, dur=0.12, vol=0.32) {
-  const o = AC.createOscillator(), g = AC.createGain();
-  o.connect(g); g.connect(AC.destination);
-  o.type = 'sine'; o.frequency.value = freq;
-  g.gain.setValueAtTime(vol, AC.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
-  o.start(); o.stop(AC.currentTime + dur);
-}
-function dupBeep() { beep(440, .08, .2); setTimeout(()=>beep(330,.08,.15), 90); }
-function okBeep()  { beep(1300,.1,.32); setTimeout(()=>beep(1600,.08,.2), 110); }
-const vib = ms => navigator.vibrate?.(ms);
-
-/* ══════════════════════════════════════════════════
-   STATUS
-══════════════════════════════════════════════════ */
-function setStatus(cls, text) {
-  statusChip.className = 'hud-chip ' + cls;
-  statusChip.textContent = text;
-  cls === 'sc' ? camWrap.classList.add('scanning') : camWrap.classList.remove('scanning');
+/* ═══════════════════════════════════════════
+   STATUS CHIP
+═══════════════════════════════════════════ */
+function setStatus(cls, text, spin=false) {
+  stChip.className = 'chip ' + cls;
+  stChip.innerHTML = text + (spin ? ' <span class="spin">⟳</span>' : '');
+  cls==='sc'||cls==='pr'
+    ? camWrap.classList.add('scanning')
+    : camWrap.classList.remove('scanning');
 }
 
-/* ══════════════════════════════════════════════════
-   INIT TESSERACT — Full page for ticket context
-   We run TWO passes:
-   1) Fast single-line pass on the Net row crop
-   2) If ticket# not found, wider pass on top region
-══════════════════════════════════════════════════ */
-async function initWorker() {
-  worker = await Tesseract.createWorker('eng', 1, { logger: ()=>{} });
-  // Allow broader charset for ticket number and date extraction
-  await worker.setParameters({
-    tessedit_char_whitelist: 'NnEeTt0123456789.,:/-° ',
-    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
-  });
-}
-
-/* ══════════════════════════════════════════════════
-   CAPTURE — full ticket frame (for context)
-   We crop the whole ticket area and let regex find everything
-══════════════════════════════════════════════════ */
-function captureFullTicket() {
+/* ═══════════════════════════════════════════
+   CAPTURE FRAME → base64
+   Full-ticket capture, slight contrast boost
+═══════════════════════════════════════════ */
+function captureFrame() {
   const vw = video.videoWidth  || 640;
   const vh = video.videoHeight || 480;
-  // Take full width, 90% height centered
-  const cw = Math.floor(vw * 0.98);
-  const ch = Math.floor(vh * 0.92);
-  const cx = Math.floor((vw - cw) / 2);
-  const cy = Math.floor((vh - ch) / 2);
-
-  const scale = 1.6;
-  canvas.width  = Math.floor(cw * scale);
-  canvas.height = Math.floor(ch * scale);
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(video, cx, cy, cw, ch, 0, 0, canvas.width, canvas.height);
-
-  // greyscale + contrast boost
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    let l = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-    l = ((l/255 - 0.5) * 2.6 + 0.5) * 255;
-    l = Math.max(0, Math.min(255, l));
-    d[i] = d[i+1] = d[i+2] = l;
-  }
-  ctx.putImageData(img, 0, 0);
-  return canvas;
+  // Scale down to 800px wide max → faster API, still readable
+  const scale = Math.min(1, 800/vw);
+  canvas.width  = Math.round(vw*scale);
+  canvas.height = Math.round(vh*scale);
+  ctx.filter = 'contrast(1.25) brightness(1.05)';
+  ctx.drawImage(video, 0,0, canvas.width, canvas.height);
+  ctx.filter = 'none';
+  // Return base64 JPEG at 85% quality
+  return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
 }
 
-/* ══════════════════════════════════════════════════
-   PARSE TICKET TEXT
-   Extracts: ticketNo, date, net
-   from SMTRA format ticket text
-══════════════════════════════════════════════════ */
-function parseTicket(text) {
-  // Normalize: remove extra spaces, common OCR noise
-  const t = text.replace(/\s+/g, ' ').replace(/[|}{[\]]/g, '');
+/* ═══════════════════════════════════════════
+   CLAUDE VISION API CALL
+   Sends image + prompt, gets back JSON
+═══════════════════════════════════════════ */
+const VISION_PROMPT = `Tu regardes un bon de pesée (ticket de bascule) SMTRA.
+Extrait UNIQUEMENT ces 3 valeurs et réponds en JSON strict, sans aucun texte autour :
+{"ticketNo":"<N° Ticket>","date":"<DD/MM/YYYY>","net":<nombre entier kg>}
 
-  // N° Ticket: 643  (also handles "N Ticket", "N°Ticket", "Ticket:", "Ticket :")
-  const ticketMatch = t.match(/[Nn][°o\.]?\s*[Tt]icket\s*:?\s*(\d+)/i)
-                   || t.match(/[Tt]icket\s*[Nn][°o\.]?\s*:?\s*(\d+)/i);
+Règles:
+- ticketNo: le numéro après "N° Ticket:" ou "Ticket:"
+- date: la date après "Date:" au format DD/MM/YYYY
+- net: le nombre en Kg après "Net:" (sans "Kg", juste le nombre)
+- Si une valeur est illisible mets null
+Exemple: {"ticketNo":"643","date":"04/04/2026","net":26000}`;
 
-  // Date: 04/04/2026  (also DD-MM-YYYY or DD.MM.YYYY)
-  const dateMatch = t.match(/[Dd]ate\s*:?\s*(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/);
-
-  // Net: 26000  (bold line — usually larger spacing)
-  // Patterns: "Net : 26000", "Net:26000", "Net  26000 Kg"
-  const netMatch = t.match(/[Nn][Ee][Tt]\s*:?\s*([\d\s]{3,8})\s*[Kk]/);
-
-  let ticketNo = null, date = null, net = null;
-
-  if (ticketMatch) ticketNo = ticketMatch[1].trim();
-  if (dateMatch)   date     = dateMatch[1].replace(/[-\.]/g, '/');
-  if (netMatch) {
-    const raw = netMatch[1].replace(/\s/g, '');
-    const val = parseFloat(raw);
-    if (!isNaN(val) && val > 0) net = val;
-  }
-
-  return { ticketNo, date, net };
+async function callClaudeVision(base64Img) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:120,
+      messages:[{
+        role:'user',
+        content:[
+          {type:'image', source:{type:'base64', media_type:'image/jpeg', data:base64Img}},
+          {type:'text',  text: VISION_PROMPT}
+        ]
+      }]
+    })
+  });
+  if(!resp.ok) throw new Error('API '+resp.status);
+  const data = await resp.json();
+  const raw  = data.content?.find(b=>b.type==='text')?.text || '{}';
+  // Strip any markdown fences
+  const clean = raw.replace(/```json?|```/g,'').trim();
+  return JSON.parse(clean);
 }
 
-/* ══════════════════════════════════════════════════
-   SCAN LOOP
-══════════════════════════════════════════════════ */
-async function scanOnce() {
-  if (isOCRBusy || !isScanning) return;
-  isOCRBusy = true;
+/* ═══════════════════════════════════════════
+   PROCESS ONE FRAME
+═══════════════════════════════════════════ */
+async function processFrame() {
+  if(isProcessing || !isRunning) return;
+  isProcessing = true;
+  setStatus('pr','LECTURE…', true);
+  tapHint.style.opacity='0';
 
-  // FPS
-  fpsF++;
-  const now = performance.now();
-  if (now - fpsT >= 2000) {
-    fpsChip.textContent = Math.round(fpsF / ((now - fpsT) / 1000)) + ' fps';
-    fpsF = 0; fpsT = now;
-  }
+  // flash frame border
+  frame.classList.add('flash');
+  setTimeout(()=>frame.classList.remove('flash'),300);
+
+  cbar.style.width='30%'; cbar.style.background='var(--b)';
 
   try {
-    const region = captureFullTicket();
-    const { data } = await worker.recognize(region);
-    const conf = data.confidence || 0;
+    const img = captureFrame();
+    const result = await callClaudeVision(img);
+    cbar.style.width='100%'; cbar.style.background='var(--g)';
 
-    confBar.style.width = conf + '%';
-    confBar.style.background = conf > 65 ? 'var(--g)' : conf > 35 ? 'var(--y)' : 'var(--r)';
+    const { ticketNo, date, net } = result;
 
-    const { ticketNo, date, net } = parseTicket(data.text);
+    // Update preview card always
+    lastNoEl.textContent   = ticketNo || '—';
+    lastDateEl.textContent = date     || '—';
+    lastNetEl.textContent  = net !== null && net !== undefined ? Number(net).toLocaleString()+' Kg' : '—';
 
-    if (net !== null) {
-      // Build dedup key — require both ticketNo and date if available
-      const key = ticketNo && date
-        ? `${ticketNo}|${date}`
-        : ticketNo
-        ? `tno:${ticketNo}`
-        : null;   // if no key info, allow through (will dedup by value+session)
-
-      updatePreview(ticketNo, date, net);
-
-      if (key && scannedKeys.has(key)) {
-        // DUPLICATE
-        setStatus('dup', `DUPLICATE #${ticketNo}`);
-        dupBadge.classList.add('show');
-        dupBeep(); vib([30,50,30]);
-        addHistoryItem({ticketNo, date, net, conf: Math.round(conf), isDup: true});
-        consecutiveMisses = 0;
-        adaptInterval(400);
-      } else {
-        // NEW TICKET
-        if (key) scannedKeys.add(key);
-        dupBadge.classList.remove('show');
-        registerScan(ticketNo, date, net, Math.round(conf));
-        consecutiveMisses = 0;
-        adaptInterval(350);
-      }
-
-      szBorder.classList.add('hit');
-      setTimeout(() => szBorder.classList.remove('hit'), 500);
-
+    if(!net) {
+      // No net value found
+      setStatus('er','NON LU', false);
+      beepErr(); vib(200);
+      setTimeout(()=>{ if(isRunning) setStatus('sc','EN ATTENTE'); tapHint.style.opacity='1'; },1500);
     } else {
-      consecutiveMisses++;
-      if (consecutiveMisses > 6) adaptInterval(700);
-      if (isScanning) setStatus('sc', 'SCANNING…');
+      const key = (ticketNo && date) ? `${ticketNo}|${date}`
+                : ticketNo ? `tno:${ticketNo}` : null;
+
+      if(key && scannedKeys.has(key)) {
+        // DUPLICATE
+        dupPill.classList.add('show');
+        setStatus('dup',`DOUBLON #${ticketNo}`);
+        beepDup(); vib([30,60,30]);
+        addHistItem({ticketNo,date,net:Number(net),isDup:true});
+      } else {
+        // NEW ✓
+        if(key) scannedKeys.add(key);
+        dupPill.classList.remove('show');
+        registerScan(ticketNo, date, Number(net));
+      }
     }
 
-  } catch(e) { console.warn('OCR:', e); }
+  } catch(e) {
+    console.error(e);
+    cbar.style.width='100%'; cbar.style.background='var(--r)';
+    setStatus('er','ERREUR', false);
+    beepErr();
+    setTimeout(()=>{ if(isRunning){setStatus('sc','EN ATTENTE');tapHint.style.opacity='1';} },2000);
+  }
 
-  isOCRBusy = false;
+  isProcessing = false;
+  // restart auto timer
+  if(isRunning && autoMode) {
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(processFrame, 3500);
+  } else if(isRunning) {
+    setStatus('sc','EN ATTENTE');
+    tapHint.style.opacity='1';
+  }
 }
 
-/* ══════════════════════════════════════════════════
-   ADAPTIVE INTERVAL
-══════════════════════════════════════════════════ */
-function adaptInterval(ms) {
-  if (ms === currentInterval) return;
-  currentInterval = ms;
-  clearInterval(scanInterval);
-  scanInterval = setInterval(scanOnce, currentInterval);
-}
-
-/* ══════════════════════════════════════════════════
-   UPDATE PREVIEW (shows last read ticket)
-══════════════════════════════════════════════════ */
-function updatePreview(ticketNo, date, net) {
-  lastTicketNo.textContent = ticketNo || '—';
-  lastDateEl.textContent   = date     || '—';
-  lastNetEl.textContent    = net !== null ? net.toLocaleString() : '—';
-}
-
-/* ══════════════════════════════════════════════════
-   REGISTER NEW SCAN
-══════════════════════════════════════════════════ */
-function registerScan(ticketNo, date, net, conf) {
+/* ═══════════════════════════════════════════
+   REGISTER SCAN
+═══════════════════════════════════════════ */
+function registerScan(ticketNo, date, net) {
   runningTotal += net;
   ticketCount++;
-  const entry = {
-    index: ticketCount, ticketNo, date, net,
-    ts: new Date().toLocaleTimeString('fr-DZ'), conf, isDup: false
-  };
+  const entry = {index:ticketCount, ticketNo, date, net,
+    ts:new Date().toLocaleTimeString('fr-DZ'), isDup:false};
   scanHistory.unshift(entry);
 
-  totalDisplay.textContent = runningTotal.toLocaleString();
-  countDisplay.textContent = ticketCount;
-  avgDisplay.textContent   = Math.round(runningTotal / ticketCount).toLocaleString();
+  totalKg.textContent    = runningTotal.toLocaleString();
+  totalCount.textContent = ticketCount;
+  avgKg.textContent      = Math.round(runningTotal/ticketCount).toLocaleString();
 
-  [totalDisplay, countDisplay].forEach(el => {
+  [totalKg,totalCount].forEach(el=>{
     el.classList.add('pop');
-    setTimeout(() => el.classList.remove('pop'), 200);
+    setTimeout(()=>el.classList.remove('pop'),200);
   });
 
-  addHistoryItem(entry);
-  setStatus('dt', `DETECTED #${ticketNo||'?'} ✓`);
-  setTimeout(() => { if(isScanning) setStatus('sc', 'SCANNING…'); }, 1000);
-  okBeep(); vib(80);
+  addHistItem(entry);
+  setStatus('ok',`✓ TICKET #${ticketNo||'?'}`);
+  beepOK(); vib(90);
+  setTimeout(()=>{ if(isRunning) setStatus('sc','EN ATTENTE'); tapHint.style.opacity='1'; },1500);
 }
 
-/* ══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    HISTORY ITEM
-══════════════════════════════════════════════════ */
-function addHistoryItem(e) {
+═══════════════════════════════════════════ */
+function addHistItem(e) {
   const li = document.createElement('li');
   li.innerHTML = `
-    <span class="tno">#${e.ticketNo||'?'}</span>
+    <span class="val-b">#${e.ticketNo||'?'}</span>
     <span>${e.date||'—'}</span>
-    <span style="color:#1e2d3d">${e.conf}%</span>
+    <span style="color:#1e2d3d">${e.ts}</span>
     ${e.isDup
-      ? '<span class="dup-tag">DUP</span>'
-      : `<span class="val">+${(e.net||0).toLocaleString()}</span>`}`;
+      ? '<span class="dup-tag">DOUBLON</span>'
+      : `<span class="val-g">+${e.net.toLocaleString()}</span>`}`;
   histList.prepend(li);
 }
 
-/* ══════════════════════════════════════════════════
-   START / STOP
-══════════════════════════════════════════════════ */
-async function startScanning() {
-  if (AC.state === 'suspended') await AC.resume();
+/* ═══════════════════════════════════════════
+   START / STOP CAMERA
+═══════════════════════════════════════════ */
+async function startCamera() {
+  initAudio();   // ← unlock audio on first user gesture
   startBtn.disabled = true;
-  setStatus('sc', 'INIT…');
+  setStatus('sc','INIT…');
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} },
-      audio: false
+      video:{facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080}},
+      audio:false
     });
-    video.srcObject = stream; await video.play();
-    if (!worker) { setStatus('sc','LOADING OCR…'); await initWorker(); }
-    isScanning = true; consecutiveMisses = 0; currentInterval = 500;
-    startBtn.textContent = '■ STOP CAMERA';
-    startBtn.classList.add('stop'); startBtn.disabled = false;
-    setStatus('sc','SCANNING…');
-    fpsT = performance.now(); fpsF = 0;
-    scanInterval = setInterval(scanOnce, currentInterval);
+    video.srcObject = stream;
+    await video.play();
+    isRunning = true;
+    captureBtn.disabled = false;
+    startBtn.textContent = '■ ARRÊTER';
+    startBtn.classList.add('stop');
+    startBtn.disabled = false;
+    setStatus('sc','EN ATTENTE');
+    tapHint.style.opacity='1';
+    // Start auto scan after 1s
+    if(autoMode) autoTimer = setTimeout(processFrame, 1000);
   } catch(err) {
-    setStatus('er','CAM ERROR'); startBtn.disabled = false;
-    alert('فشل الوصول للكاميرا:\n' + err.message);
+    setStatus('er','CAM ERREUR');
+    startBtn.disabled = false;
+    alert('Erreur caméra:\n'+err.message);
   }
 }
 
-function stopScanning() {
-  isScanning = false; isOCRBusy = false;
-  clearInterval(scanInterval); scanInterval = null;
-  stream?.getTracks().forEach(t => t.stop());
+function stopCamera() {
+  isRunning = false; isProcessing = false;
+  clearTimeout(autoTimer);
+  stream?.getTracks().forEach(t=>t.stop());
   stream = null; video.srcObject = null;
   camWrap.classList.remove('scanning');
-  startBtn.textContent = '▶ START CAMERA';
+  captureBtn.disabled = true;
+  startBtn.textContent = '▶ DÉMARRER';
   startBtn.classList.remove('stop');
+  startBtn.disabled = false;
+  cbar.style.width='0';
+  tapHint.style.opacity='0';
   setStatus('','READY');
-  fpsChip.textContent = '— fps';
-  confBar.style.width = '0';
 }
 
-startBtn.addEventListener('click', () => isScanning ? stopScanning() : startScanning());
-
-document.getElementById('clearBtn').addEventListener('click', () => {
-  runningTotal = ticketCount = 0;
-  scanHistory = []; scannedKeys.clear();
-  totalDisplay.textContent = '0';
-  countDisplay.textContent = '0';
-  avgDisplay.textContent   = '—';
-  histList.innerHTML = '';
-  updatePreview(null,null,null);
-  dupBadge.classList.remove('show');
+/* ── events ── */
+startBtn.addEventListener('click', ()=>{
+  initAudio();
+  isRunning ? stopCamera() : startCamera();
 });
 
-/* ══════════════════════════════════════════════════
-   BUILD REPORT
-══════════════════════════════════════════════════ */
+// Manual capture button
+captureBtn.addEventListener('click', ()=>{
+  initAudio();
+  clearTimeout(autoTimer);
+  processFrame();
+});
+
+// Tap on camera also triggers scan
+camWrap.addEventListener('click', ()=>{
+  if(!isRunning || isProcessing) return;
+  initAudio();
+  clearTimeout(autoTimer);
+  processFrame();
+});
+
+/* ── clear ── */
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  runningTotal=ticketCount=0; scanHistory=[];
+  scannedKeys.clear();
+  totalKg.textContent='0'; totalCount.textContent='0'; avgKg.textContent='—';
+  histList.innerHTML='';
+  lastNoEl.textContent=lastDateEl.textContent='—';
+  lastNetEl.textContent='—';
+  dupPill.classList.remove('show');
+});
+
+/* ═══════════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════════ */
 function buildReport() {
-  const now = new Date().toLocaleString('fr-DZ');
-  const valid = scanHistory.filter(e => !e.isDup);
-  const dups  = scanHistory.filter(e => e.isDup);
-  const avg   = valid.length ? Math.round(runningTotal/valid.length).toLocaleString() : '—';
+  const now   = new Date().toLocaleString('fr-DZ');
+  const valid = scanHistory.filter(e=>!e.isDup);
+  const dups  = scanHistory.filter(e=>e.isDup);
   const nets  = valid.map(e=>e.net);
-  const maxV  = nets.length ? Math.max(...nets).toLocaleString() : '—';
-  const minV  = nets.length ? Math.min(...nets).toLocaleString() : '—';
+  const avg   = valid.length ? Math.round(runningTotal/valid.length).toLocaleString():'—';
+  const maxV  = nets.length  ? Math.max(...nets).toLocaleString():'—';
+  const minV  = nets.length  ? Math.min(...nets).toLocaleString():'—';
 
   return [
-    '══════════════════════════════════════════════',
-    '   SMTRA NET SCANNER — OMAR MLW 2026',
-    '   Société des Travaux Routiers — Mostaganem',
-    '══════════════════════════════════════════════',
-    `Date/Heure Export : ${now}`,
-    `Tickets valides   : ${valid.length}`,
-    `Doublons ignorés  : ${dups.length}`,
-    `Total NET (Kg)    : ${runningTotal.toLocaleString()}`,
-    `Total NET (T)     : ${(runningTotal/1000).toFixed(2)}`,
-    `Moyenne (Kg)      : ${avg}`,
-    `Maximum (Kg)      : ${maxV}`,
-    `Minimum (Kg)      : ${minV}`,
-    '──────────────────────────────────────────────',
-    'DÉTAIL DES TICKETS:',
+    '═══════════════════════════════════════════════',
+    '  SMTRA — BON DE PESÉE RÉCAPITULATIF',
+    '  Société des Travaux Routiers et Assainissement',
+    '  54 Cité Abane Ramdane — Mostaganem',
+    '═══════════════════════════════════════════════',
+    `Export le        : ${now}`,
+    `Tickets valides  : ${valid.length}`,
+    `Doublons rejetés : ${dups.length}`,
+    `Total NET        : ${runningTotal.toLocaleString()} Kg`,
+    `Total NET        : ${(runningTotal/1000).toFixed(3)} T`,
+    `Moyenne          : ${avg} Kg`,
+    `Maximum          : ${maxV} Kg`,
+    `Minimum          : ${minV} Kg`,
+    '───────────────────────────────────────────────',
+    'DÉTAIL:',
     '',
-    ...valid.slice().reverse().map(e =>
-      `#${String(e.index).padStart(3,'0')} | Ticket: ${String(e.ticketNo||'?').padStart(5)} | ${e.date||'—'} | ${e.ts} | NET: ${String(e.net.toLocaleString()).padStart(8)} Kg | Conf: ${e.conf}%`
-    ),
-    dups.length ? '\nDOUBLONS DÉTECTÉS:' : '',
-    ...dups.map(e => `  ⚠ Ticket ${e.ticketNo||'?'} du ${e.date||'—'} (ignoré)`),
+    ...valid.slice().reverse().map(e=>
+      `#${String(e.index).padStart(3,'0')} | T${String(e.ticketNo||'?').padStart(5)} | ${e.date||'—'} | ${e.ts} | ${String(e.net.toLocaleString()).padStart(8)} Kg`),
+    dups.length ? '\nDOUBLONS DÉTECTÉS ET IGNORÉS:':'',
+    ...dups.map(e=>`  ⚠ Ticket ${e.ticketNo||'?'} — ${e.date||'—'}`),
     '',
-    '══════════════════════════════════════════════',
-  ].filter(l => l !== null && l !== undefined).join('\n');
+    '═══════════════════════════════════════════════',
+    '  Édité par OMAR MLW Scanner v4',
+    '═══════════════════════════════════════════════',
+  ].join('\n');
 }
 
-function refreshPreview() {
-  document.getElementById('exportPreview').textContent =
-    ticketCount > 0 ? buildReport() : '— لا توجد بيانات —';
+function refreshPreview(){
+  document.getElementById('exportPrev').textContent =
+    ticketCount||scannedKeys.size ? buildReport() : '— لا توجد بيانات —';
 }
 
-document.getElementById('dlTxt').addEventListener('click', () => {
-  if (!ticketCount && scannedKeys.size === 0) { alert('لا توجد بيانات.'); return; }
-  const blob = new Blob([buildReport()], {type:'text/plain;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `smtra_net_${Date.now()}.txt`;
+document.getElementById('dlBtn').addEventListener('click',()=>{
+  if(!ticketCount){alert('لا توجد بيانات.');return;}
+  const b=new Blob([buildReport()],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(b);
+  a.download=`smtra_${Date.now()}.txt`;
   a.click(); URL.revokeObjectURL(a.href);
 });
 
-document.getElementById('cpTxt').addEventListener('click', () => {
-  if (!ticketCount) { alert('لا توجد بيانات.'); return; }
-  navigator.clipboard?.writeText(buildReport()).then(() => alert('تم النسخ ✓'));
+document.getElementById('cpBtn').addEventListener('click',()=>{
+  if(!ticketCount){alert('لا توجد بيانات.');return;}
+  navigator.clipboard?.writeText(buildReport()).then(()=>alert('تم النسخ ✓'));
 });
 
 document.getElementById('prevBtn').addEventListener('click', refreshPreview);
 
-/* ══════════════════════════════════════════════════
-   CLAUDE AI
-══════════════════════════════════════════════════ */
-document.querySelectorAll('.qq').forEach(b => b.addEventListener('click', () => {
-  document.getElementById('aiPrompt').value = b.dataset.q;
+/* ═══════════════════════════════════════════
+   CLAUDE AI ANALYSIS
+═══════════════════════════════════════════ */
+document.querySelectorAll('.qq').forEach(b=>b.addEventListener('click',()=>{
+  document.getElementById('aiPrompt').value=b.dataset.q;
 }));
 
-document.getElementById('aiBtn').addEventListener('click', async () => {
-  const valid = scanHistory.filter(e => !e.isDup);
-  if (!valid.length) {
-    document.getElementById('aiOutput').innerHTML = '<span style="color:var(--y)">⚠ امسح تذاكر أولاً</span>';
-    return;
-  }
-  const question = document.getElementById('aiPrompt').value.trim()
-    || 'حلل هذه البيانات وأعطني ملخصاً شاملاً';
-
-  const aiBtn = document.getElementById('aiBtn');
-  const aiOutput = document.getElementById('aiOutput');
-  aiBtn.disabled = true;
-  aiOutput.innerHTML = '<span style="color:#2a3a4a;animation:blink 1s infinite">⏳ Claude يحلل البيانات…</span>';
-
-  const nets = valid.map(e => e.net);
-  const context = `
-أنت محلل بيانات. إليك بيانات تذاكر وزن SMTRA (شركة الأشغال الطرقية، مستغانم):
-
-- عدد التذاكر الصحيحة: ${valid.length}
-- عدد الدوبلونات المرفوضة: ${scanHistory.filter(e=>e.isDup).length}
-- إجمالي NET: ${runningTotal.toLocaleString()} Kg (${(runningTotal/1000).toFixed(2)} طن)
-- المتوسط: ${valid.length ? Math.round(runningTotal/valid.length).toLocaleString() : '—'} Kg
-- الأعلى: ${nets.length ? Math.max(...nets).toLocaleString() : '—'} Kg
-- الأدنى: ${nets.length ? Math.min(...nets).toLocaleString() : '—'} Kg
-- قيم NET (Kg): ${nets.join(', ')}
+document.getElementById('aiAnalyzeBtn').addEventListener('click', async ()=>{
+  const valid = scanHistory.filter(e=>!e.isDup);
+  const aiOut = document.getElementById('aiOut');
+  const aiBtn = document.getElementById('aiAnalyzeBtn');
+  if(!valid.length){aiOut.innerHTML='<span style="color:var(--y)">⚠ امسح تذاكر أولاً</span>';return;}
+  const q = document.getElementById('aiPrompt').value.trim()||'حلل البيانات وأعطني ملخصاً شاملاً';
+  aiBtn.disabled=true;
+  aiOut.innerHTML='<span style="color:#2a3a4a">⏳ Claude يحلل…</span>';
+  const nets=valid.map(e=>e.net);
+  const ctx2=`أنت محلل بيانات متخصص. بيانات تذاكر وزن SMTRA (بيزر، مستغانم):
+- تذاكر صحيحة: ${valid.length} | دوبلونات: ${scanHistory.filter(e=>e.isDup).length}
+- إجمالي NET: ${runningTotal.toLocaleString()} Kg = ${(runningTotal/1000).toFixed(3)} طن
+- متوسط: ${Math.round(runningTotal/valid.length).toLocaleString()} Kg
+- أعلى: ${Math.max(...nets).toLocaleString()} Kg | أدنى: ${Math.min(...nets).toLocaleString()} Kg
+- قيم NET: ${nets.join(', ')}
 - أرقام التذاكر: ${valid.map(e=>e.ticketNo||'?').join(', ')}
-- التواريخ: ${[...new Set(valid.map(e=>e.date||'—'))].join(', ')}
-
-السؤال: ${question}
-
-أجب بالعربية، مختصر ومباشر، استخدم أرقاماً دقيقة، ورموز تعبيرية للتنظيم.`;
-
+- منتج: BB (بيتوم/بيبي)
+السؤال: ${q}
+أجب بالعربية، مختصر ومباشر، ارقام دقيقة، رموز للتنظيم.`;
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514', max_tokens: 1000,
-        messages: [{ role: 'user', content: context }]
-      })
-    });
-    const data = await resp.json();
-    const text = data.content?.find(b => b.type==='text')?.text || 'لا يوجد رد';
-    aiOutput.innerHTML = text
-      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--g)">$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em style="color:var(--b)">$1</em>');
-  } catch(err) {
-    aiOutput.innerHTML = `<span style="color:var(--r)">❌ خطأ: ${err.message}</span>`;
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,
+        messages:[{role:'user',content:ctx2}]})});
+    const d=await r.json();
+    const txt=d.content?.find(b=>b.type==='text')?.text||'لا يوجد رد';
+    aiOut.innerHTML=txt
+      .replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--g)">$1</strong>')
+      .replace(/\*(.*?)\*/g,'<em style="color:var(--b)">$1</em>');
+  } catch(e){
+    aiOut.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`;
   }
-  aiBtn.disabled = false;
+  aiBtn.disabled=false;
 });
 </script>
 </body>
