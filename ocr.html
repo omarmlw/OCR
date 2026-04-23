@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>Scanner</title>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+<style>
+body { text-align:center; font-family:Arial; direction:rtl; }
+video { width:300px; border:2px solid #333; }
+button { padding:10px 20px; margin:10px; font-size:18px; cursor:pointer; }
+#total { font-size:24px; color:green; }
+</style>
+</head>
+
+<body>
+
+<h2>📷 قراءة التذاكر</h2>
+
+<button onclick="startCamera()">تشغيل الكاميرا</button>
+<button onclick="capture()">التقاط</button>
+
+<br>
+<video id="video" autoplay playsinline></video>
+
+<div id="status"></div>
+<div id="result"></div>
+<div id="total">المجموع: 0</div>
+
+<script>
+let total = 0;
+let stream = null;
+
+function startCamera(){
+document.getElementById("status").innerText = "جاري تشغيل الكاميرا...";
+
+navigator.mediaDevices.getUserMedia({ video:true })
+.then(s=>{
+stream = s;
+document.getElementById("video").srcObject = s;
+document.getElementById("status").innerText = "✅ الكاميرا تعمل";
+})
+.catch(err=>{
+document.getElementById("status").innerText = "❌ فشل الكاميرا: " + err;
+alert("لازم تفتح الصفحة عبر https أو localhost وتسمح بالكاميرا");
+});
+}
+
+function capture(){
+if(!stream){
+alert("شغل الكاميرا أولا");
+return;
+}
+
+document.getElementById("status").innerText = "📸 يتم التقاط الصورة...";
+
+const video = document.getElementById("video");
+const canvas = document.createElement("canvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
+ctx.drawImage(video,0,0);
+
+document.getElementById("status").innerText = "🤖 جاري قراءة النص...";
+
+Tesseract.recognize(canvas,'eng')
+.then(({data:{text}})=>{
+
+document.getElementById("result").innerText = text;
+
+// استخراج Net
+let match = text.match(/Net[:\s]*([\d]+)/i);
+
+if(match){
+let value = parseInt(match[1]);
+total += value;
+document.getElementById("total").innerText = "المجموع: " + total;
+}else{
+alert("⚠️ لم يتم العثور على Net");
+}
+
+document.getElementById("status").innerText = "✅ تم التحليل";
+
+})
+.catch(err=>{
+document.getElementById("status").innerText = "❌ خطأ OCR";
+console.error(err);
+});
+}
+</script>
+
+</body>
+</html>
