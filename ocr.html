@@ -1,94 +1,638 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Fast Scanner</title>
-
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Net Ticket Scanner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <style>
-body { text-align:center; font-family:Arial; direction:rtl; }
-video { width:320px; border:2px solid #333; }
-#total { font-size:26px; color:green; margin-top:20px; }
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Teko:wght@400;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green:   #00ff88;
+    --green2:  #00c96a;
+    --red:     #ff4444;
+    --bg:      #0a0c0f;
+    --panel:   #111418;
+    --border:  #1e2530;
+    --text:    #c8d6e5;
+    --mono:    'Share Tech Mono', monospace;
+    --display: 'Teko', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    overflow-x: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 12px 32px;
+    gap: 14px;
+    min-height: 100dvh;
+  }
+
+  /* ── Header ── */
+  header {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    font-family: var(--display);
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--green);
+    text-shadow: 0 0 18px rgba(0,255,136,.35);
+  }
+
+  header .badge {
+    font-size: .65rem;
+    letter-spacing: 1.5px;
+    color: #4a5568;
+    text-transform: uppercase;
+  }
+
+  /* ── Camera wrapper ── */
+  .cam-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    aspect-ratio: 4/3;
+    background: #050608;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* scanning overlay box */
+  .scan-box {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 75%; height: 26%;
+    border: 2px solid var(--green);
+    border-radius: 4px;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,.45), inset 0 0 12px rgba(0,255,136,.12);
+    pointer-events: none;
+    transition: border-color .2s;
+  }
+  .scan-box.detected { border-color: #00ffff; box-shadow: 0 0 0 2000px rgba(0,0,0,.45), inset 0 0 20px rgba(0,255,255,.25); }
+
+  /* corner ticks */
+  .scan-box::before, .scan-box::after,
+  .scan-box .tick-br, .scan-box .tick-bl {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    border-color: var(--green);
+    border-style: solid;
+  }
+  .scan-box::before  { top: -2px; left: -2px;  border-width: 3px 0 0 3px; }
+  .scan-box::after   { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
+  .scan-box .tick-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+  .scan-box .tick-bl { bottom: -2px; left: -2px;  border-width: 0 0 3px 3px; }
+
+  /* scan line animation */
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    animation: sweep 1.6s ease-in-out infinite;
+    opacity: 0;
+  }
+  .scanning .scan-line { opacity: 1; }
+  @keyframes sweep {
+    0%   { top: 0%; }
+    50%  { top: calc(100% - 2px); }
+    100% { top: 0%; }
+  }
+
+  /* status chip */
+  .status-chip {
+    position: absolute;
+    bottom: 8px; left: 50%;
+    transform: translateX(-50%);
+    font-size: .65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: rgba(0,0,0,.7);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    transition: color .2s, border-color .2s;
+  }
+  .status-chip.ready    { color: #4a5568; }
+  .status-chip.scanning { color: var(--green); border-color: rgba(0,255,136,.4); }
+  .status-chip.detected { color: #00ffff;   border-color: rgba(0,255,255,.4); }
+  .status-chip.error    { color: var(--red); border-color: rgba(255,68,68,.4); }
+
+  /* ── Total panel ── */
+  .total-panel {
+    width: 100%;
+    max-width: 480px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .total-label {
+    font-size: .6rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #4a5568;
+  }
+
+  .total-value {
+    font-family: var(--display);
+    font-size: 3.2rem;
+    font-weight: 700;
+    color: var(--green);
+    text-shadow: 0 0 24px rgba(0,255,136,.4);
+    line-height: 1;
+    letter-spacing: 1px;
+    transition: transform .15s;
+  }
+  .total-value.pop { transform: scale(1.08); }
+
+  /* ── History ── */
+  .history-panel {
+    width: 100%;
+    max-width: 480px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    flex: 1;
+  }
+
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .history-title {
+    font-size: .6rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #4a5568;
+  }
+
+  #clearBtn {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: none;
+    border: 1px solid #1e2530;
+    color: #4a5568;
+    padding: 3px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: color .2s, border-color .2s;
+  }
+  #clearBtn:hover { color: var(--red); border-color: rgba(255,68,68,.4); }
+
+  #historyList {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  #historyList::-webkit-scrollbar { width: 4px; }
+  #historyList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  #historyList li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: .8rem;
+    color: #4a6080;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+    animation: fadeIn .3s ease;
+  }
+  #historyList li span.val { color: var(--green2); }
+  #historyList li span.idx { font-size: .6rem; color: #2d3748; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+  /* ── Button ── */
+  #startBtn {
+    width: 100%;
+    max-width: 480px;
+    font-family: var(--display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: transparent;
+    border: 2px solid var(--green);
+    color: var(--green);
+    padding: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .2s, color .2s, box-shadow .2s;
+  }
+  #startBtn:hover, #startBtn:active {
+    background: var(--green);
+    color: #0a0c0f;
+    box-shadow: 0 0 24px rgba(0,255,136,.35);
+  }
+  #startBtn.stop {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  #startBtn.stop:hover, #startBtn.stop:active {
+    background: var(--red);
+    color: #fff;
+    box-shadow: 0 0 24px rgba(255,68,68,.35);
+  }
+
+  /* ── Canvas (hidden) ── */
+  #canvas { display: none; }
 </style>
 </head>
-
 <body>
 
-<h2>⚡ قراءة سريعة (Net)</h2>
+<header>
+  <h1>NET SCANNER</h1>
+  <span class="badge">By OMAR MLW — 2026</span>
+</header>
 
-<button onclick="startCamera()">تشغيل</button>
+<!-- Camera preview -->
+<div class="cam-wrap" id="camWrap">
+  <video id="video" autoplay playsinline muted></video>
+  <div class="scan-box" id="scanBox">
+    <span class="tick-br"></span>
+    <span class="tick-bl"></span>
+    <div class="scan-line"></div>
+  </div>
+  <div class="status-chip ready" id="statusChip">READY</div>
+</div>
 
-<br>
-<video id="video" autoplay playsinline></video>
+<!-- Total display -->
+<div class="total-panel">
+  <div>
+    <div class="total-label">Running Total</div>
+    <div class="total-value" id="totalDisplay">0.00</div>
+  </div>
+  <div style="text-align:right">
+    <div class="total-label">Tickets</div>
+    <div style="font-family:var(--display);font-size:2rem;color:#4a5568;line-height:1" id="countDisplay">0</div>
+  </div>
+</div>
 
-<div id="total">المجموع: 0</div>
+<!-- Scan history -->
+<div class="history-panel">
+  <div class="history-header">
+    <span class="history-title">Scan History</span>
+    <button id="clearBtn">Clear</button>
+  </div>
+  <ul id="historyList"></ul>
+</div>
 
-<audio id="beep">
-<source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg">
-</audio>
+<!-- Start/Stop button -->
+<button id="startBtn">▶ Start Camera</button>
+
+<!-- Hidden canvas for frame capture -->
+<canvas id="canvas"></canvas>
 
 <script>
-let total = 0;
-let lastValue = null;
+  /* ───────────────────────────────────────────────
+     STATE
+  ─────────────────────────────────────────────── */
+  let stream        = null;   // MediaStream
+  let scanInterval  = null;   // interval handle
+  let worker        = null;   // Tesseract worker
+  let isScanning    = false;
+  let isProcessing  = false;  // debounce OCR calls
+  let runningTotal  = 0;
+  let ticketCount   = 0;
+  let lastScannedValue = null; // prevent duplicate scans
+  let scanHistory   = [];
 
-async function startCamera(){
-const stream = await navigator.mediaDevices.getUserMedia({
-video: { facingMode: "environment" }
-});
-document.getElementById("video").srcObject = stream;
+  /* ───────────────────────────────────────────────
+     ELEMENTS
+  ─────────────────────────────────────────────── */
+  const video        = document.getElementById('video');
+  const canvas       = document.getElementById('canvas');
+  const ctx          = canvas.getContext('2d');
+  const startBtn     = document.getElementById('startBtn');
+  const totalDisplay = document.getElementById('totalDisplay');
+  const countDisplay = document.getElementById('countDisplay');
+  const historyList  = document.getElementById('historyList');
+  const statusChip   = document.getElementById('statusChip');
+  const scanBox      = document.getElementById('scanBox');
+  const camWrap      = document.getElementById('camWrap');
+  const clearBtn     = document.getElementById('clearBtn');
 
-fastScan();
-}
+  /* ───────────────────────────────────────────────
+     AUDIO – short beep via Web Audio API
+  ─────────────────────────────────────────────── */
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-function fastScan(){
-const video = document.getElementById("video");
+  function beep() {
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type            = 'sine';
+    osc.frequency.value = 1200;           // Hz
+    gain.gain.setValueAtTime(.4, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + .15);
+    osc.start();
+    osc.stop(audioCtx.currentTime + .15);
+  }
 
-setInterval(() => {
+  /* ───────────────────────────────────────────────
+     VIBRATION (mobile only)
+  ─────────────────────────────────────────────── */
+  function vibrate() {
+    if (navigator.vibrate) navigator.vibrate(60);
+  }
 
-if(video.readyState !== 4) return;
+  /* ───────────────────────────────────────────────
+     STATUS CHIP
+  ─────────────────────────────────────────────── */
+  function setStatus(state, text) {
+    statusChip.className = `status-chip ${state}`;
+    statusChip.textContent = text;
+    if (state === 'scanning') {
+      camWrap.classList.add('scanning');
+    } else {
+      camWrap.classList.remove('scanning');
+    }
+  }
 
-// ⚡ Canvas صغير (تسريع)
-const canvas = document.createElement("canvas");
-const ctx = canvas.getContext("2d");
+  /* ───────────────────────────────────────────────
+     INIT TESSERACT WORKER
+  ─────────────────────────────────────────────── */
+  async function initWorker() {
+    worker = await Tesseract.createWorker('eng', 1, {
+      // suppress verbose logs
+      logger: () => {}
+    });
 
-// نقص فقط الجزء السفلي (مكان Net تقريبا)
-canvas.width = 200;
-canvas.height = 100;
+    // Restrict character set: digits, dot, comma, and the word "Net"
+    await worker.setParameters({
+      tessedit_char_whitelist: 'NetNET0123456789.,: ',
+      tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+    });
+  }
 
-ctx.drawImage(video,
-0, video.videoHeight * 0.6, // قص من الأسفل
-video.videoWidth, video.videoHeight * 0.4,
-0, 0, 200, 100);
+  /* ───────────────────────────────────────────────
+     CROP CENTER REGION FROM VIDEO FRAME
+     Crops the center 75% width × 26% height of the
+     video – matching the visual scan-box overlay.
+  ─────────────────────────────────────────────── */
+  function captureRegion() {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
 
-// ⚡ قراءة سريعة
-Tesseract.recognize(canvas, 'eng', {
-tessedit_char_whitelist: '0123456789Net'
-})
-.then(({data:{text}})=>{
+    // Match scan-box proportions: 75% w, 26% h, centered
+    const cropW = Math.floor(vw * 0.75);
+    const cropH = Math.floor(vh * 0.26);
+    const cropX = Math.floor((vw - cropW) / 2);
+    const cropY = Math.floor((vh - cropH) / 2);
 
-let match = text.match(/Net[:\s]*([\d]+)/i);
+    // Render at 2× for better OCR accuracy
+    const scale = 2;
+    canvas.width  = cropW * scale;
+    canvas.height = cropH * scale;
 
-if(match){
-let value = parseInt(match[1]);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
 
-if(value !== lastValue){
-lastValue = value;
-total += value;
+    // Contrast boost: convert to greyscale + increase contrast
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d   = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      // greyscale
+      const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+      // contrast stretch: push dark darker, light lighter
+      const c   = ((lum / 255 - 0.5) * 2.2 + 0.5) * 255;
+      const v   = Math.max(0, Math.min(255, c));
+      d[i] = d[i+1] = d[i+2] = v;
+    }
+    ctx.putImageData(img, 0, 0);
 
-document.getElementById("total").innerText = "المجموع: " + total;
+    return canvas.toDataURL('image/png');
+  }
 
-// 🔊 صوت
-document.getElementById("beep").play();
-}
-}
+  /* ───────────────────────────────────────────────
+     EXTRACT NET VALUE FROM OCR TEXT
+     Regex: looks for "Net" (case-insensitive)
+     followed (optionally) by colon/space and digits.
+  ─────────────────────────────────────────────── */
+  function extractNetValue(text) {
+    // e.g.  "Net: 125.50"  or  "NET 84"  or  "Net:84.00"
+    const match = text.match(/[Nn][Ee][Tt]\s*[:\-]?\s*([\d]+(?:[.,]\d+)?)/);
+    if (!match) return null;
+    // normalise comma decimal separator → dot
+    const raw = match[1].replace(',', '.');
+    const val = parseFloat(raw);
+    return isNaN(val) ? null : val;
+  }
 
-});
+  /* ───────────────────────────────────────────────
+     SINGLE SCAN CYCLE
+  ─────────────────────────────────────────────── */
+  async function scanFrame() {
+    if (isProcessing || !isScanning) return;
+    isProcessing = true;
 
-}, 700); // ⚡ أسرع (0.7 ثانية)
+    try {
+      const dataURL = captureRegion();
+      const { data: { text } } = await worker.recognize(dataURL);
+      const value = extractNetValue(text);
 
-}
+      if (value !== null) {
+        // Ignore if same as last scan (duplicate prevention)
+        if (value !== lastScannedValue) {
+          lastScannedValue = value;
+          registerScan(value);
+        }
+        // Show "detected" UI briefly even for duplicates
+        flashDetected();
+      }
+    } catch (err) {
+      console.warn('OCR error:', err);
+    }
+
+    isProcessing = false;
+  }
+
+  /* ───────────────────────────────────────────────
+     REGISTER A NEW SCAN
+  ─────────────────────────────────────────────── */
+  function registerScan(value) {
+    runningTotal += value;
+    ticketCount++;
+    scanHistory.unshift({ value, index: ticketCount });
+
+    // Update displays
+    totalDisplay.textContent = runningTotal.toFixed(2);
+    countDisplay.textContent = ticketCount;
+
+    // Pop animation on total
+    totalDisplay.classList.add('pop');
+    setTimeout(() => totalDisplay.classList.remove('pop'), 200);
+
+    // Add to history list
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span class="idx">#${ticketCount}</span>
+      <span>NET detected</span>
+      <span class="val">+ ${value.toFixed(2)}</span>
+    `;
+    historyList.prepend(li);
+
+    // Audio + haptic feedback
+    beep();
+    vibrate();
+
+    setStatus('detected', 'DETECTED ✓');
+    setTimeout(() => {
+      if (isScanning) setStatus('scanning', 'SCANNING…');
+    }, 800);
+  }
+
+  /* ───────────────────────────────────────────────
+     VISUAL FLASH ON DETECTION
+  ─────────────────────────────────────────────── */
+  function flashDetected() {
+    scanBox.classList.add('detected');
+    setTimeout(() => scanBox.classList.remove('detected'), 600);
+  }
+
+  /* ───────────────────────────────────────────────
+     START CAMERA + SCANNING
+  ─────────────────────────────────────────────── */
+  async function startScanning() {
+    // Resume suspended audio context (required on mobile after user gesture)
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    setStatus('scanning', 'STARTING…');
+    startBtn.disabled = true;
+
+    try {
+      // Force back camera on mobile
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:  { ideal: 1280 },
+          height: { ideal: 960 },
+        },
+        audio: false,
+      });
+
+      video.srcObject = stream;
+      await video.play();
+
+      // Init worker if needed
+      if (!worker) {
+        setStatus('scanning', 'LOADING OCR…');
+        await initWorker();
+      }
+
+      isScanning = true;
+      startBtn.textContent = '■ Stop Camera';
+      startBtn.classList.add('stop');
+      startBtn.disabled = false;
+      setStatus('scanning', 'SCANNING…');
+
+      // Scan every 600ms
+      scanInterval = setInterval(scanFrame, 600);
+
+    } catch (err) {
+      console.error('Camera error:', err);
+      setStatus('error', 'CAM ERROR');
+      startBtn.disabled = false;
+      alert('Camera access failed.\n\nPlease allow camera permission and try again.\n\n' + err.message);
+    }
+  }
+
+  /* ───────────────────────────────────────────────
+     STOP SCANNING
+  ─────────────────────────────────────────────── */
+  function stopScanning() {
+    isScanning = false;
+    isProcessing = false;
+
+    clearInterval(scanInterval);
+    scanInterval = null;
+
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+
+    video.srcObject = null;
+    lastScannedValue = null;  // reset duplicate guard on stop
+
+    startBtn.textContent = '▶ Start Camera';
+    startBtn.classList.remove('stop');
+    setStatus('ready', 'READY');
+  }
+
+  /* ───────────────────────────────────────────────
+     CLEAR HISTORY
+  ─────────────────────────────────────────────── */
+  function clearHistory() {
+    runningTotal = 0;
+    ticketCount  = 0;
+    scanHistory  = [];
+    lastScannedValue = null;
+    totalDisplay.textContent = '0.00';
+    countDisplay.textContent = '0';
+    historyList.innerHTML    = '';
+  }
+
+  /* ───────────────────────────────────────────────
+     EVENT LISTENERS
+  ─────────────────────────────────────────────── */
+  startBtn.addEventListener('click', () => {
+    if (isScanning) {
+      stopScanning();
+    } else {
+      startScanning();
+    }
+  });
+
+  clearBtn.addEventListener('click', clearHistory);
 </script>
-
 </body>
 </html>
