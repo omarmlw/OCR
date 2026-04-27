@@ -1,109 +1,560 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<title>Ultra Fast Scanner</title>
-
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>SMTRA NET SCANNER v4</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <style>
-body { text-align:center; font-family:Arial; direction:rtl; }
-video { width:320px; border:2px solid #333; border-radius:10px; }
-#box {
-    position: absolute;
-    border: 3px solid red;
-    width: 200px;
-    height: 80px;
-    top: 150px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-#total { font-size:26px; color:green; margin-top:20px; }
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--g:#00ff88;--g2:#00c96a;--b:#00d4ff;--r:#ff4455;--y:#ffd000;--bg:#07090c;--p1:#0d1117;--p2:#111820;--brd:#1a2332;--txt:#8ba3be;--mono:'Share Tech Mono',monospace;--orb:'Orbitron',sans-serif;}
+html,body{background:var(--bg);color:var(--txt);font-family:var(--mono);min-height:100dvh}
+body{display:flex;flex-direction:column;align-items:center;padding:10px 10px 40px;gap:10px}
+header{width:100%;max-width:520px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--brd);padding-bottom:10px}
+h1{font-family:var(--orb);font-size:1.1rem;color:var(--g);letter-spacing:2px;text-shadow:0 0 18px rgba(0,255,136,.4)}
+.ver{font-size:.5rem;letter-spacing:1.5px;color:#1e2d3d;text-align:right;line-height:1.8}
+.tabs{width:100%;max-width:520px;display:grid;grid-template-columns:repeat(3,1fr);background:var(--p1);border:1px solid var(--brd);border-radius:6px;overflow:hidden}
+.tab{font-family:var(--orb);font-size:.52rem;letter-spacing:1px;padding:9px 2px;text-align:center;cursor:pointer;background:none;border:none;color:#2a3a4a;transition:color .2s,background .2s}
+.tab.active{color:var(--g);background:rgba(0,255,136,.05);border-bottom:2px solid var(--g)}
+.panel{display:none;width:100%;max-width:520px;flex-direction:column;gap:10px}
+.panel.active{display:flex}
+.cam-wrap{position:relative;width:100%;aspect-ratio:4/3;background:#020304;border:1px solid var(--brd);border-radius:8px;overflow:hidden}
+#video{width:100%;height:100%;object-fit:cover;display:block}
+#snapCanvas{width:100%;height:100%;object-fit:cover;display:none;position:absolute;inset:0}
+.guide-box{position:absolute;left:4%;right:4%;top:50%;transform:translateY(-50%);height:75%;border:2px dashed rgba(0,255,136,.3);border-radius:4px;pointer-events:none}
+.guide-label{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:.52rem;letter-spacing:1.5px;color:rgba(0,255,136,.4);white-space:nowrap}
+.cap-btn{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-family:var(--orb);font-size:.85rem;letter-spacing:2px;background:rgba(0,255,136,.92);color:#07090c;border:none;padding:11px 30px;border-radius:30px;cursor:pointer;font-weight:700;box-shadow:0 4px 20px rgba(0,255,136,.45);transition:transform .1s;white-space:nowrap;z-index:10}
+.cap-btn:active{transform:translateX(-50%) scale(.94)}
+#reCapBtn{display:none;background:rgba(0,212,255,.9);box-shadow:0 4px 20px rgba(0,212,255,.4)}
+.status-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--p1);border:1px solid var(--brd);border-radius:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#2a3a4a;transition:background .3s,box-shadow .3s;flex-shrink:0}
+.dot.ready{background:var(--g);box-shadow:0 0 8px var(--g)}
+.dot.scan{background:var(--b);box-shadow:0 0 8px var(--b);animation:p 1s infinite}
+.dot.dup{background:var(--y);box-shadow:0 0 8px var(--y)}
+.dot.err{background:var(--r);box-shadow:0 0 8px var(--r)}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.35}}
+#statusText{font-size:.72rem;letter-spacing:.8px;flex:1}
+#confText{font-size:.58rem;color:#2a3a4a}
+.debug-box{background:var(--p2);border:1px solid var(--brd);border-radius:4px;padding:8px;font-size:.58rem;color:#3a5068;line-height:1.6;max-height:80px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;display:none}
+.debug-box.show{display:block}
+.extracted{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:7px}
+.ex-row{display:flex;justify-content:space-between;align-items:center}
+.ex-lbl{font-size:.5rem;letter-spacing:2px;color:#2a3a4a;text-transform:uppercase}
+.ex-val{font-size:.85rem;color:var(--txt)}
+.ex-val.big{font-family:var(--orb);font-size:1.9rem;color:var(--g);font-weight:700;text-shadow:0 0 14px rgba(0,255,136,.3);line-height:1}
+.ex-val.blue{color:var(--b)}
+.dup-tag{font-size:.55rem;color:var(--y);background:rgba(255,208,0,.1);border:1px solid rgba(255,208,0,.3);padding:2px 8px;border-radius:10px;display:none}
+.dup-tag.show{display:inline}
+.upload-row{display:flex;gap:8px}
+#uploadBtn{flex:1;font-family:var(--mono);font-size:.65rem;letter-spacing:1px;padding:10px;border-radius:6px;cursor:pointer;background:transparent;border:1px solid var(--brd);color:#3a5068;transition:color .2s,border-color .2s}
+#uploadBtn:hover{color:var(--b);border-color:rgba(0,212,255,.4)}
+#fileInput{display:none}
+#dbgBtn{font-family:var(--mono);font-size:.58rem;letter-spacing:1px;padding:10px 14px;border-radius:6px;cursor:pointer;background:transparent;border:1px solid var(--brd);color:#2a3a4a;transition:color .2s,border-color .2s;white-space:nowrap}
+#dbgBtn.on{color:var(--y);border-color:rgba(255,208,0,.3)}
+.add-btn{width:100%;font-family:var(--orb);font-size:.9rem;font-weight:700;letter-spacing:2px;padding:14px;border-radius:6px;cursor:pointer;background:var(--g);color:#07090c;border:none;transition:box-shadow .2s,opacity .2s}
+.add-btn:hover{box-shadow:0 0 22px rgba(0,255,136,.4)}
+.add-btn:disabled{opacity:.25;cursor:not-allowed}
+.totals{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tc{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:10px}
+.tc-lbl{font-size:.46rem;letter-spacing:2px;color:#1e2d3d;text-transform:uppercase;margin-bottom:4px}
+.tc-val{font-family:var(--orb);font-size:1.3rem;font-weight:700;line-height:1;color:var(--g);transition:transform .15s}
+.tc-val.pop{transform:scale(1.1)}.tc-val.b{color:var(--b)}.tc-val.y{color:var(--y)}
+.hbox{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:10px 12px}
+.hb-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hb-title{font-size:.5rem;letter-spacing:2.5px;color:#2a3a4a;text-transform:uppercase}
+.ghost{font-family:var(--mono);font-size:.5rem;letter-spacing:1.5px;background:none;border:1px solid var(--brd);color:#2a3a4a;padding:3px 10px;border-radius:3px;cursor:pointer;transition:color .2s,border-color .2s}
+.ghost:hover{color:var(--r);border-color:rgba(255,68,85,.4)}
+#histList{list-style:none;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto}
+#histList::-webkit-scrollbar{width:3px}#histList::-webkit-scrollbar-thumb{background:var(--brd)}
+#histList li{display:flex;justify-content:space-between;align-items:center;font-size:.68rem;color:#3a5068;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.025);animation:fi .25s ease}
+#histList li .v{color:var(--g2)}#histList li .tn{color:var(--b);font-size:.6rem}
+@keyframes fi{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:none}}
+.ai-card{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:9px}
+.card-lbl{font-size:.5rem;letter-spacing:3px;color:#2a3a4a;text-transform:uppercase}
+.qq-row{display:flex;flex-wrap:wrap;gap:6px}
+.qq{font-family:var(--mono);font-size:.58rem;background:none;border:1px solid var(--brd);color:#3a5068;padding:4px 10px;border-radius:20px;cursor:pointer;transition:color .2s,border-color .2s}
+.qq:hover{color:var(--b);border-color:rgba(0,212,255,.4)}
+#aiPrompt{width:100%;font-family:var(--mono);font-size:.72rem;background:var(--p2);border:1px solid var(--brd);color:var(--txt);padding:8px 12px;border-radius:5px;resize:none;height:55px;outline:none;transition:border-color .2s}
+#aiPrompt:focus{border-color:rgba(0,212,255,.4)}
+.ai-btn{width:100%;font-family:var(--orb);font-size:.7rem;letter-spacing:2px;padding:11px;border-radius:5px;cursor:pointer;background:transparent;border:1px solid var(--b);color:var(--b);transition:background .2s,color .2s}
+.ai-btn:hover{background:var(--b);color:#07090c}.ai-btn:disabled{opacity:.3;cursor:not-allowed}
+.ai-out{font-size:.76rem;line-height:1.75;color:var(--txt);white-space:pre-wrap;word-break:break-word;min-height:80px;max-height:260px;overflow-y:auto}
+.ai-out::-webkit-scrollbar{width:3px}.ai-out::-webkit-scrollbar-thumb{background:var(--brd)}
+.ex-card{background:var(--p1);border:1px solid var(--brd);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.ex-row2{display:flex;gap:8px;align-items:center}
+.ex-lbl2{font-size:.5rem;letter-spacing:2px;color:#2a3a4a;flex:1;text-transform:uppercase}
+.ex-action{font-family:var(--mono);font-size:.56rem;letter-spacing:1.5px;background:none;border:1px solid var(--brd);color:#3a5068;padding:7px 14px;border-radius:4px;cursor:pointer;transition:color .2s,border-color .2s,background .2s}
+.ex-action:hover{color:var(--g);border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.05)}
+#expPrev{font-size:.6rem;line-height:1.8;color:#2a3a4a;background:var(--p2);border:1px solid var(--brd);border-radius:4px;padding:10px;max-height:220px;overflow-y:auto;white-space:pre;font-family:var(--mono)}
+#expPrev::-webkit-scrollbar{width:3px}#expPrev::-webkit-scrollbar-thumb{background:var(--brd)}
+#canvas{display:none}
 </style>
 </head>
-
 <body>
 
-<h2>⚡ قارئ سريع جدا (Net)</h2>
+<header>
+  <h1>SMTRA SCANNER</h1>
+  <div class="ver">OMAR MLW — 2026<br>v4 · PHOTO MODE</div>
+</header>
 
-<button onclick="startCamera()">تشغيل</button>
-
-<br>
-<div style="position:relative; display:inline-block;">
-    <video id="video" autoplay playsinline></video>
-    <div id="box"></div>
+<div class="tabs">
+  <button class="tab active" data-tab="scanner">📷 SCANNER</button>
+  <button class="tab" data-tab="ai">🤖 AI</button>
+  <button class="tab" data-tab="export">💾 EXPORT</button>
 </div>
 
-<div id="total">المجموع: 0</div>
+<!-- SCANNER -->
+<div class="panel active" id="panel-scanner">
+  <div class="cam-wrap" id="camWrap">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="snapCanvas"></canvas>
+    <div class="guide-box"><div class="guide-label">ضع التذكرة كاملة داخل الإطار</div></div>
+    <button class="cap-btn" id="capBtn">📸 التقط وامسح</button>
+    <button class="cap-btn" id="reCapBtn">🔄 إعادة التقاط</button>
+  </div>
 
-<audio id="beep">
-<source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg">
-</audio>
+  <div class="upload-row">
+    <button id="uploadBtn">🖼 رفع صورة من المعرض</button>
+    <input type="file" id="fileInput" accept="image/*"/>
+    <button id="dbgBtn">🔧 DEBUG</button>
+  </div>
+
+  <div class="status-bar">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">جارٍ تحميل محرك OCR…</span>
+    <span id="confText"></span>
+  </div>
+
+  <div class="debug-box" id="debugBox"></div>
+
+  <div class="extracted">
+    <div class="ex-row">
+      <span class="ex-lbl">N° TICKET</span>
+      <span class="ex-val blue" id="exTicket">—</span>
+      <span class="dup-tag" id="dupTag">⚠ DUPLICATE</span>
+    </div>
+    <div class="ex-row">
+      <span class="ex-lbl">DATE</span>
+      <span class="ex-val" id="exDate">—</span>
+    </div>
+    <div class="ex-row">
+      <span class="ex-lbl">NET (Kg)</span>
+      <span class="ex-val big" id="exNet">—</span>
+    </div>
+  </div>
+
+  <button class="add-btn" id="addBtn" disabled>➕ إضافة للإجمالي</button>
+
+  <div class="totals">
+    <div class="tc"><div class="tc-lbl">TOTAL Kg</div><div class="tc-val" id="totalDisplay">0</div></div>
+    <div class="tc"><div class="tc-lbl">TICKETS</div><div class="tc-val b" id="countDisplay">0</div></div>
+    <div class="tc"><div class="tc-lbl">AVERAGE</div><div class="tc-val y" id="avgDisplay">—</div></div>
+  </div>
+
+  <div class="hbox">
+    <div class="hb-hdr">
+      <span class="hb-title">SCAN HISTORY</span>
+      <button class="ghost" id="clearBtn">CLEAR ALL</button>
+    </div>
+    <ul id="histList"></ul>
+  </div>
+</div>
+
+<!-- AI -->
+<div class="panel" id="panel-ai">
+  <div class="ai-card">
+    <div class="card-lbl">QUICK QUESTIONS</div>
+    <div class="qq-row">
+      <button class="qq" data-q="حلل البيانات وأعطني ملخصاً شاملاً">📊 ملخص</button>
+      <button class="qq" data-q="هل توجد قيم شاذة في Net؟">🔍 شذوذات</button>
+      <button class="qq" data-q="أعطني أعلى، أدنى، متوسط الحمولات">📈 إحصاء</button>
+      <button class="qq" data-q="حوّل الإجمالي لطن وقدّر عدد الرحلات">🚛 طن</button>
+      <button class="qq" data-q="هل البيانات منطقية؟ يوجد تكرار؟">✅ تحقق</button>
+    </div>
+    <div class="card-lbl">CUSTOM PROMPT</div>
+    <textarea id="aiPrompt" placeholder="اكتب سؤالك…"></textarea>
+    <button class="ai-btn" id="aiBtn">🤖 ANALYZE WITH CLAUDE AI</button>
+    <div class="ai-out" id="aiOut"><span style="color:#1e2d3d">— في انتظار التحليل —</span></div>
+  </div>
+</div>
+
+<!-- EXPORT -->
+<div class="panel" id="panel-export">
+  <div class="ex-card">
+    <div class="ex-row2"><div class="ex-lbl2">📄 تحميل TXT</div><button class="ex-action" id="dlTxt">DOWNLOAD</button></div>
+    <div class="ex-row2"><div class="ex-lbl2">📋 نسخ للحافظة</div><button class="ex-action" id="cpTxt">COPY</button></div>
+    <div class="ex-row2"><div class="ex-lbl2">🔄 تحديث المعاينة</div><button class="ex-action" id="prevBtn">REFRESH</button></div>
+    <div class="card-lbl">PREVIEW</div>
+    <pre id="expPrev">— لا توجد بيانات —</pre>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
 
 <script>
-let total = 0;
-let lastValue = null;
+/* STATE */
+let stream=null,worker=null,workerReady=false,isProcessing=false;
+let runningTotal=0,ticketCount=0,scanHistory=[],pendingResult=null,debugMode=false;
+const scannedKeys=new Set();
 
+/* ELEMENTS */
+const video=document.getElementById('video');
+const snapCanvas=document.getElementById('snapCanvas');
+const snapCtx=snapCanvas.getContext('2d');
+const canvas=document.getElementById('canvas');
+const pCtx=canvas.getContext('2d',{willReadFrequently:true});
+const capBtn=document.getElementById('capBtn');
+const reCapBtn=document.getElementById('reCapBtn');
+const addBtn=document.getElementById('addBtn');
+const statusDot=document.getElementById('statusDot');
+const statusText=document.getElementById('statusText');
+const confText=document.getElementById('confText');
+const debugBox=document.getElementById('debugBox');
+const exTicket=document.getElementById('exTicket');
+const exDate=document.getElementById('exDate');
+const exNet=document.getElementById('exNet');
+const dupTag=document.getElementById('dupTag');
+const totalDisplay=document.getElementById('totalDisplay');
+const countDisplay=document.getElementById('countDisplay');
+const avgDisplay=document.getElementById('avgDisplay');
+const histList=document.getElementById('histList');
+
+/* TABS */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab,.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  if(t.dataset.tab==='export')refreshPreview();
+}));
+
+/* AUDIO */
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+function resumeAC(){if(AC.state==='suspended')AC.resume();}
+function tone(f,d,v=0.3,tp='sine'){
+  resumeAC();
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.connect(g);g.connect(AC.destination);
+  o.type=tp;o.frequency.value=f;
+  g.gain.setValueAtTime(v,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);
+  o.start();o.stop(AC.currentTime+d);
+}
+const okBeep=()=>{tone(1200,.08,.32);setTimeout(()=>tone(1600,.1,.26),90);};
+const dupBeep=()=>{tone(400,.1,.25);setTimeout(()=>tone(300,.12,.2),100);};
+const errBeep=()=>tone(200,.2,.2,'sawtooth');
+const vib=ms=>navigator.vibrate?.(ms);
+
+/* STATUS */
+function setStatus(state,text,conf=''){
+  statusDot.className='dot '+state;
+  statusText.textContent=text;
+  confText.textContent=conf;
+}
+
+/* INIT TESSERACT */
+async function initWorker(){
+  try{
+    worker=await Tesseract.createWorker('eng',1,{logger:()=>{}});
+    await worker.setParameters({
+      tessedit_char_whitelist:'NnEeTtIiCcKkAaDdBbRrGuUGg°0123456789.,:/-/ ',
+      tessedit_pageseg_mode:Tesseract.PSM.AUTO,
+    });
+    workerReady=true;
+    setStatus('ready','جاهز — التقط صورة التذكرة 📸');
+  }catch(e){
+    setStatus('err','فشل تحميل OCR: '+e.message);
+  }
+}
+
+/* CAMERA */
 async function startCamera(){
-const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},
+      audio:false
+    });
+    video.srcObject=stream;
+    await video.play();
+  }catch(err){
+    setStatus('err','فشل الكاميرا: '+err.message);
+  }
+}
+
+/* PREPROCESS */
+function preprocessImage(src){
+  const w=src.width||src.videoWidth||640;
+  const h=src.height||src.videoHeight||480;
+  canvas.width=w;canvas.height=h;
+  pCtx.drawImage(src,0,0,w,h);
+  // greyscale
+  const img=pCtx.getImageData(0,0,w,h);
+  const d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    const l=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    d[i]=d[i+1]=d[i+2]=l;
+  }
+  pCtx.putImageData(img,0,0);
+  // contrast
+  pCtx.filter='contrast(170%) brightness(108%)';
+  pCtx.drawImage(canvas,0,0);
+  pCtx.filter='none';
+  return canvas;
+}
+
+/* PARSE SMTRA TICKET */
+function parseTicket(raw){
+  const t=raw.replace(/[|}{[\]\\]/g,' ').replace(/\s+/g,' ').trim();
+
+  // Ticket number: "N° Ticket : 643" / "No Ticket: 643" / "Ticket : 643"
+  let ticketNo=null;
+  const tmA=t.match(/[Nn][°o\.]?\s*[Tt]icket\s*:?\s*(\d{2,6})/i);
+  const tmB=t.match(/[Tt]icket\s*[Nn][°o\.]?\s*:?\s*(\d{2,6})/i);
+  const tmC=t.match(/[Tt]icket\s*:\s*(\d{2,6})/i);
+  if(tmA)ticketNo=tmA[1];
+  else if(tmB)ticketNo=tmB[1];
+  else if(tmC)ticketNo=tmC[1];
+
+  // Date: "04/04/2026"
+  let date=null;
+  const dm=t.match(/[Dd]ate\s*:?\s*(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/);
+  // also bare date
+  const dm2=t.match(/(\d{2}[\/]\d{2}[\/]\d{4})/);
+  if(dm)date=dm[1].replace(/[-\.]/g,'/');
+  else if(dm2)date=dm2[1];
+
+  // Net: "Net : 26000 Kg" / "Net:26000" / "NET 26 000 Kg"
+  let net=null;
+  const nm=t.match(/[Nn][Ee][Tt]\s*:?\s*([\d][\d\s]{2,8})\s*[Kk]/);
+  if(nm){
+    const v=parseFloat(nm[1].replace(/\s/g,''));
+    if(!isNaN(v)&&v>=100&&v<=200000)net=v;
+  }
+
+  return{ticketNo,date,net,raw:t};
+}
+
+/* RUN OCR */
+async function runOCR(imgElement){
+  if(!workerReady){setStatus('scan','OCR لم يتحمل — انتظر...');return;}
+  if(isProcessing)return;
+  isProcessing=true;
+  addBtn.disabled=true;
+  pendingResult=null;
+  setStatus('scan','⏳ جارٍ قراءة التذكرة…');
+
+  try{
+    // Draw to snapCanvas first for display
+    if(imgElement!==snapCanvas){
+      snapCanvas.width=imgElement.naturalWidth||imgElement.videoWidth||640;
+      snapCanvas.height=imgElement.naturalHeight||imgElement.videoHeight||480;
+      snapCtx.drawImage(imgElement,0,0);
+    }
+
+    const processed=preprocessImage(snapCanvas);
+    const{data}=await worker.recognize(processed);
+    const conf=Math.round(data.confidence||0);
+
+    if(debugMode){
+      debugBox.textContent='=== RAW OCR (conf:'+conf+'%) ===\n'+data.text;
+    }
+    confText.textContent='conf: '+conf+'%';
+
+    const{ticketNo,date,net}=parseTicket(data.text);
+
+    exTicket.textContent=ticketNo||'؟ لم يُقرأ';
+    exDate.textContent=date||'؟ لم يُقرأ';
+
+    if(net===null){
+      exNet.textContent='لم يُعثر على Net';
+      setStatus('err','❌ تعذّر قراءة Net — حرّك التذكرة وحاول مجدداً');
+      errBeep();vib([40,30,40]);
+      isProcessing=false;
+      return;
+    }
+
+    exNet.textContent=net.toLocaleString();
+
+    const key=ticketNo&&date?`${ticketNo}|${date}`:ticketNo?`t:${ticketNo}`:null;
+    const isDup=key?scannedKeys.has(key):false;
+    pendingResult={ticketNo,date,net,conf,isDup,key};
+
+    if(isDup){
+      dupTag.classList.add('show');
+      setStatus('dup',`⚠ تذكرة مكررة! #${ticketNo} — ${date}`);
+      dupBeep();vib([30,50,30]);
+    }else{
+      dupTag.classList.remove('show');
+      setStatus('ready',`✅ تم — Net: ${net.toLocaleString()} Kg`);
+      addBtn.disabled=false;
+      okBeep();vib(80);
+    }
+  }catch(e){
+    setStatus('err','خطأ OCR: '+e.message);
+    errBeep();
+    console.error(e);
+  }
+  isProcessing=false;
+}
+
+/* SHOW/HIDE */
+function showSnapshot(){
+  video.style.display='none';
+  snapCanvas.style.display='block';
+  capBtn.style.display='none';
+  reCapBtn.style.display='block';
+}
+function showLive(){
+  video.style.display='block';
+  snapCanvas.style.display='none';
+  capBtn.style.display='block';
+  reCapBtn.style.display='none';
+  addBtn.disabled=true;pendingResult=null;
+  exTicket.textContent='—';exDate.textContent='—';exNet.textContent='—';
+  dupTag.classList.remove('show');confText.textContent='';
+  if(workerReady)setStatus('ready','جاهز — التقط صورة التذكرة 📸');
+}
+
+/* CAPTURE */
+capBtn.addEventListener('click',async()=>{
+  resumeAC();
+  if(!video.videoWidth){setStatus('err','الكاميرا غير جاهزة');return;}
+  snapCanvas.width=video.videoWidth;
+  snapCanvas.height=video.videoHeight;
+  snapCtx.drawImage(video,0,0);
+  showSnapshot();
+  await runOCR(snapCanvas);
 });
 
-document.getElementById("video").srcObject = stream;
+reCapBtn.addEventListener('click',()=>showLive());
 
-startScan();
+/* ADD */
+addBtn.addEventListener('click',()=>{
+  if(!pendingResult||pendingResult.isDup)return;
+  const{ticketNo,date,net,conf,key}=pendingResult;
+  if(key)scannedKeys.add(key);
+  runningTotal+=net;ticketCount++;
+  const entry={index:ticketCount,ticketNo,date,net,conf,ts:new Date().toLocaleTimeString('fr-DZ'),isDup:false};
+  scanHistory.unshift(entry);
+  totalDisplay.textContent=runningTotal.toLocaleString();
+  countDisplay.textContent=ticketCount;
+  avgDisplay.textContent=Math.round(runningTotal/ticketCount).toLocaleString();
+  [totalDisplay,countDisplay].forEach(el=>{el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),200);});
+  const li=document.createElement('li');
+  li.innerHTML=`<span class="tn">#${ticketNo||'?'}</span><span>${date||'—'}</span><span style="color:#1e2d3d">${conf}%</span><span class="v">+${net.toLocaleString()}</span>`;
+  histList.prepend(li);
+  pendingResult=null;addBtn.disabled=true;
+  setStatus('ready',`✅ مضاف! الإجمالي: ${runningTotal.toLocaleString()} Kg`);
+  setTimeout(()=>showLive(),1400);
+});
+
+/* UPLOAD */
+document.getElementById('uploadBtn').addEventListener('click',()=>{resumeAC();document.getElementById('fileInput').click();});
+document.getElementById('fileInput').addEventListener('change',async(e)=>{
+  const file=e.target.files[0];if(!file)return;
+  const img=new Image();
+  img.onload=async()=>{
+    snapCanvas.width=img.naturalWidth;snapCanvas.height=img.naturalHeight;
+    snapCtx.drawImage(img,0,0);
+    showSnapshot();
+    await runOCR(snapCanvas);
+    URL.revokeObjectURL(img.src);
+  };
+  img.src=URL.createObjectURL(file);
+  e.target.value='';
+});
+
+/* DEBUG */
+document.getElementById('dbgBtn').addEventListener('click',()=>{
+  debugMode=!debugMode;
+  document.getElementById('dbgBtn').classList.toggle('on',debugMode);
+  debugBox.classList.toggle('show',debugMode);
+  if(!debugMode)debugBox.textContent='';
+});
+
+/* CLEAR */
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  runningTotal=ticketCount=0;scanHistory=[];scannedKeys.clear();pendingResult=null;
+  totalDisplay.textContent='0';countDisplay.textContent='0';avgDisplay.textContent='—';
+  histList.innerHTML='';showLive();
+});
+
+/* REPORT */
+function buildReport(){
+  const now=new Date().toLocaleString('fr-DZ');
+  const valid=scanHistory.filter(e=>!e.isDup);
+  const nets=valid.map(e=>e.net);
+  const avg=valid.length?Math.round(runningTotal/valid.length).toLocaleString():'—';
+  return[
+    '══════════════════════════════════════════════',
+    '  SMTRA NET SCANNER — OMAR MLW 2026',
+    '  Société des Travaux Routiers — Mostaganem',
+    '══════════════════════════════════════════════',
+    `Date Export   : ${now}`,
+    `Tickets       : ${valid.length}`,
+    `Total NET     : ${runningTotal.toLocaleString()} Kg`,
+    `Total NET (T) : ${(runningTotal/1000).toFixed(3)} T`,
+    `Moyenne       : ${avg} Kg`,
+    `Maximum       : ${nets.length?Math.max(...nets).toLocaleString():'—'} Kg`,
+    `Minimum       : ${nets.length?Math.min(...nets).toLocaleString():'—'} Kg`,
+    '──────────────────────────────────────────────',
+    ...valid.slice().reverse().map(e=>`#${String(e.index).padStart(3,'0')} | T:${String(e.ticketNo||'?').padStart(5)} | ${e.date||'——/——/————'} | ${e.ts} | NET:${String(e.net.toLocaleString()).padStart(8)} Kg`),
+    '','══════════════════════════════════════════════',
+  ].join('\n');
 }
+function refreshPreview(){document.getElementById('expPrev').textContent=ticketCount>0?buildReport():'— لا توجد بيانات —';}
+document.getElementById('dlTxt').addEventListener('click',()=>{
+  if(!ticketCount){alert('لا توجد بيانات.');return;}
+  const b=new Blob([buildReport()],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download=`smtra_${Date.now()}.txt`;a.click();URL.revokeObjectURL(a.href);
+});
+document.getElementById('cpTxt').addEventListener('click',()=>{
+  if(!ticketCount){alert('لا توجد بيانات.');return;}
+  navigator.clipboard?.writeText(buildReport()).then(()=>alert('تم النسخ ✓'));
+});
+document.getElementById('prevBtn').addEventListener('click',refreshPreview);
 
-function startScan(){
-setInterval(scan, 600); // ⚡ أسرع
-}
+/* AI */
+document.querySelectorAll('.qq').forEach(b=>b.addEventListener('click',()=>{document.getElementById('aiPrompt').value=b.dataset.q;}));
+document.getElementById('aiBtn').addEventListener('click',async()=>{
+  const valid=scanHistory.filter(e=>!e.isDup);
+  if(!valid.length){document.getElementById('aiOut').innerHTML='<span style="color:var(--y)">⚠ امسح تذاكر أولاً</span>';return;}
+  const q=document.getElementById('aiPrompt').value.trim()||'حلل البيانات وأعطني ملخصاً';
+  const aiBtn=document.getElementById('aiBtn');
+  const aiOut=document.getElementById('aiOut');
+  aiBtn.disabled=true;
+  aiOut.innerHTML='<span style="color:#2a3a4a">⏳ Claude يحلل…</span>';
+  const nets=valid.map(e=>e.net);
+  const ctx2=`أنت محلل بيانات لشركة SMTRA (أشغال طرقية، مستغانم).
+بيانات تذاكر الوزن:
+- عدد التذاكر: ${valid.length}
+- الإجمالي: ${runningTotal.toLocaleString()} Kg — ${(runningTotal/1000).toFixed(3)} طن
+- المتوسط: ${Math.round(runningTotal/valid.length).toLocaleString()} Kg
+- الأعلى: ${Math.max(...nets).toLocaleString()} Kg | الأدنى: ${Math.min(...nets).toLocaleString()} Kg
+- القيم (Kg): ${nets.join(', ')}
+- أرقام التذاكر: ${valid.map(e=>e.ticketNo||'?').join(', ')}
+- التواريخ: ${[...new Set(valid.map(e=>e.date||'—'))].join(', ')}
+السؤال: ${q}
+أجب بالعربية، مختصر ودقيق، استخدم رموز تعبيرية.`;
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:ctx2}]})
+    });
+    const data=await r.json();
+    const text=data.content?.find(b=>b.type==='text')?.text||'لا يوجد رد';
+    aiOut.innerHTML=text.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--g)">$1</strong>').replace(/\*(.*?)\*/g,'<em style="color:var(--b)">$1</em>');
+  }catch(err){aiOut.innerHTML=`<span style="color:var(--r)">❌ ${err.message}</span>`;}
+  aiBtn.disabled=false;
+});
 
-function scan(){
-const video = document.getElementById("video");
-
-if(video.readyState !== 4) return;
-
-const canvas = document.createElement("canvas");
-const ctx = canvas.getContext("2d");
-
-// 🎯 قص فقط المنطقة الوسطى (مكان Net)
-const w = video.videoWidth;
-const h = video.videoHeight;
-
-const cropW = w * 0.6;
-const cropH = h * 0.2;
-
-const x = (w - cropW)/2;
-const y = (h - cropH)/2;
-
-canvas.width = cropW;
-canvas.height = cropH;
-
-ctx.drawImage(video, x, y, cropW, cropH, 0, 0, cropW, cropH);
-
-Tesseract.recognize(canvas, 'eng', {
-    tessedit_char_whitelist: '0123456789Net'
-})
-.then(({data:{text}})=>{
-
-let match = text.match(/Net[:\s]*([\d]+)/i);
-
-if(match){
-let value = parseInt(match[1]);
-
-if(value !== lastValue){
-    lastValue = value;
-    total += value;
-
-    document.getElementById("total").innerText = "المجموع: " + total;
-
-    document.getElementById("beep").play();
-}
-}
-
-}).catch(()=>{});
-}
+/* INIT */
+(async()=>{
+  setStatus('scan','جارٍ تحميل محرك OCR…');
+  await startCamera();
+  await initWorker();
+})();
 </script>
-
 </body>
 </html>
